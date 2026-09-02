@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Jikan</string>
+    <string name="accessibility_service_label">Jikan App Lock</string>
+    <string name="accessibility_service_description">Lets Jikan detect when a locked app opens so it can redirect you to a quick Japanese study session first.</string>
+</resources>

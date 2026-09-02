@@ -1,0 +1,379 @@
+[
+  {
+    "id": "hira_a",
+    "character": "あ",
+    "romaji": "a",
+    "mnemonic": "Looks like a person with their arms out, saying \"ahh\".",
+    "tier": "hiragana_vowels",
+    "audio": "hira_a.mp3"
+  },
+  {
+    "id": "hira_i",
+    "character": "い",
+    "romaji": "i",
+    "mnemonic": "Two strokes, like two people standing tall shouting \"ee\".",
+    "tier": "hiragana_vowels",
+    "audio": "hira_i.mp3"
+  },
+  {
+    "id": "hira_u",
+    "character": "う",
+    "romaji": "u",
+    "mnemonic": "A curved hood shape, like an \"oo\" sound echoing.",
+    "tier": "hiragana_vowels",
+    "audio": "hira_u.mp3"
+  },
+  {
+    "id": "hira_e",
+    "character": "え",
+    "romaji": "e",
+    "mnemonic": "Looks like a person bending forward, exclaiming \"eh?\".",
+    "tier": "hiragana_vowels",
+    "audio": "hira_e.mp3"
+  },
+  {
+    "id": "hira_o",
+    "character": "お",
+    "romaji": "o",
+    "mnemonic": "A curled shape like an \"oh!\" of surprise.",
+    "tier": "hiragana_vowels",
+    "audio": "hira_o.mp3"
+  },
+
+  {
+    "id": "hira_ka",
+    "character": "か",
+    "romaji": "ka",
+    "mnemonic": "Looks like a sickle cutting - \"ka-chunk\".",
+    "tier": "hiragana_k",
+    "audio": "hira_ka.mp3"
+  },
+  {
+    "id": "hira_ki",
+    "character": "き",
+    "romaji": "ki",
+    "mnemonic": "A key-like shape - \"key\".",
+    "tier": "hiragana_k",
+    "audio": "hira_ki.mp3"
+  },
+  {
+    "id": "hira_ku",
+    "character": "く",
+    "romaji": "ku",
+    "mnemonic": "A boomerang shape - \"coo\".",
+    "tier": "hiragana_k",
+    "audio": "hira_ku.mp3"
+  },
+  {
+    "id": "hira_ke",
+    "character": "け",
+    "romaji": "ke",
+    "mnemonic": "Like a person kneeling - \"keh\".",
+    "tier": "hiragana_k",
+    "audio": "hira_ke.mp3"
+  },
+  {
+    "id": "hira_ko",
+    "character": "こ",
+    "romaji": "ko",
+    "mnemonic": "Two horizontal strokes like two coins - \"koh\".",
+    "tier": "hiragana_k",
+    "audio": "hira_ko.mp3"
+  },
+
+  {
+    "id": "hira_sa",
+    "character": "さ",
+    "romaji": "sa",
+    "mnemonic": "Looks like a saw - \"saw\".",
+    "tier": "hiragana_s",
+    "audio": "hira_sa.mp3"
+  },
+  {
+    "id": "hira_shi",
+    "character": "し",
+    "romaji": "shi",
+    "mnemonic": "A single swooping stroke like a fishhook - \"she\".",
+    "tier": "hiragana_s",
+    "audio": "hira_shi.mp3"
+  },
+  {
+    "id": "hira_su",
+    "character": "す",
+    "romaji": "su",
+    "mnemonic": "A swirl, like a straw sucking - \"soo\".",
+    "tier": "hiragana_s",
+    "audio": "hira_su.mp3"
+  },
+  {
+    "id": "hira_se",
+    "character": "せ",
+    "romaji": "se",
+    "mnemonic": "Looks like a seesaw - \"seh\".",
+    "tier": "hiragana_s",
+    "audio": "hira_se.mp3"
+  },
+  {
+    "id": "hira_so",
+    "character": "そ",
+    "romaji": "so",
+    "mnemonic": "A zigzag like sewing thread - \"so\".",
+    "tier": "hiragana_s",
+    "audio": "hira_so.mp3"
+  },
+
+  {
+    "id": "hira_ta",
+    "character": "た",
+    "romaji": "ta",
+    "mnemonic": "Looks like a taco stand - \"tah\".",
+    "tier": "hiragana_t",
+    "audio": "hira_ta.mp3"
+  },
+  {
+    "id": "hira_chi",
+    "character": "ち",
+    "romaji": "chi",
+    "mnemonic": "A curved stroke like a cheerleader's pose - \"chee\".",
+    "tier": "hiragana_t",
+    "audio": "hira_chi.mp3"
+  },
+  {
+    "id": "hira_tsu",
+    "character": "つ",
+    "romaji": "tsu",
+    "mnemonic": "A wave shape, like a tsunami - \"tsoo\".",
+    "tier": "hiragana_t",
+    "audio": "hira_tsu.mp3"
+  },
+  {
+    "id": "hira_te",
+    "character": "て",
+    "romaji": "te",
+    "mnemonic": "A single bent stroke like a telephone pole - \"teh\".",
+    "tier": "hiragana_t",
+    "audio": "hira_te.mp3"
+  },
+  {
+    "id": "hira_to",
+    "character": "と",
+    "romaji": "to",
+    "mnemonic": "Looks like a toe - \"toh\".",
+    "tier": "hiragana_t",
+    "audio": "hira_to.mp3"
+  },
+
+  {
+    "id": "hira_na",
+    "character": "な",
+    "romaji": "na",
+    "mnemonic": "Looks like a knot - \"nah\".",
+    "tier": "hiragana_n",
+    "audio": "hira_na.mp3"
+  },
+  {
+    "id": "hira_ni",
+    "character": "に",
+    "romaji": "ni",
+    "mnemonic": "Looks like the number \"ni\" (2 legs) - \"nee\".",
+    "tier": "hiragana_n",
+    "audio": "hira_ni.mp3"
+  },
+  {
+    "id": "hira_nu",
+    "character": "ぬ",
+    "romaji": "nu",
+    "mnemonic": "A noodle-like loop - \"noo\".",
+    "tier": "hiragana_n",
+    "audio": "hira_nu.mp3"
+  },
+  {
+    "id": "hira_ne",
+    "character": "ね",
+    "romaji": "ne",
+    "mnemonic": "A cat with a curled tail - \"neh\" (like \"neko\" = cat).",
+    "tier": "hiragana_n",
+    "audio": "hira_ne.mp3"
+  },
+  {
+    "id": "hira_no",
+    "character": "の",
+    "romaji": "no",
+    "mnemonic": "A single loop, like shaking your head \"no\".",
+    "tier": "hiragana_n",
+    "audio": "hira_no.mp3"
+  },
+
+  {
+    "id": "hira_ha",
+    "character": "は",
+    "romaji": "ha",
+    "mnemonic": "Looks like a person laughing - \"ha!\".",
+    "tier": "hiragana_h",
+    "audio": "hira_ha.mp3"
+  },
+  {
+    "id": "hira_hi",
+    "character": "ひ",
+    "romaji": "hi",
+    "mnemonic": "A single curved stroke like a smiling face - \"hee\".",
+    "tier": "hiragana_h",
+    "audio": "hira_hi.mp3"
+  },
+  {
+    "id": "hira_fu",
+    "character": "ふ",
+    "romaji": "fu",
+    "mnemonic": "Looks like Mount Fuji - \"foo\".",
+    "tier": "hiragana_h",
+    "audio": "hira_fu.mp3"
+  },
+  {
+    "id": "hira_he",
+    "character": "へ",
+    "romaji": "he",
+    "mnemonic": "A single peak, like a mountain - \"heh\".",
+    "tier": "hiragana_h",
+    "audio": "hira_he.mp3"
+  },
+  {
+    "id": "hira_ho",
+    "character": "ほ",
+    "romaji": "ho",
+    "mnemonic": "Like \"ha\" with an extra stroke - \"ho\".",
+    "tier": "hiragana_h",
+    "audio": "hira_ho.mp3"
+  },
+
+  {
+    "id": "hira_ma",
+    "character": "ま",
+    "romaji": "ma",
+    "mnemonic": "Looks like a mother's curled hair - \"mah\".",
+    "tier": "hiragana_m",
+    "audio": "hira_ma.mp3"
+  },
+  {
+    "id": "hira_mi",
+    "character": "み",
+    "romaji": "mi",
+    "mnemonic": "A swirling number 3 - \"mee\".",
+    "tier": "hiragana_m",
+    "audio": "hira_mi.mp3"
+  },
+  {
+    "id": "hira_mu",
+    "character": "む",
+    "romaji": "mu",
+    "mnemonic": "Looks like a cow's face - \"moo\".",
+    "tier": "hiragana_m",
+    "audio": "hira_mu.mp3"
+  },
+  {
+    "id": "hira_me",
+    "character": "め",
+    "romaji": "me",
+    "mnemonic": "A single loop like an eye - \"meh\" (eye = me in Japanese).",
+    "tier": "hiragana_m",
+    "audio": "hira_me.mp3"
+  },
+  {
+    "id": "hira_mo",
+    "character": "も",
+    "romaji": "mo",
+    "mnemonic": "A fishhook shape - \"moh\".",
+    "tier": "hiragana_m",
+    "audio": "hira_mo.mp3"
+  },
+
+  {
+    "id": "hira_ya",
+    "character": "や",
+    "romaji": "ya",
+    "mnemonic": "Looks like a yak's horn - \"yah\".",
+    "tier": "hiragana_yayuyo",
+    "audio": "hira_ya.mp3"
+  },
+  {
+    "id": "hira_yu",
+    "character": "ゆ",
+    "romaji": "yu",
+    "mnemonic": "A hook like a fishing rod catching \"you\".",
+    "tier": "hiragana_yayuyo",
+    "audio": "hira_yu.mp3"
+  },
+  {
+    "id": "hira_yo",
+    "character": "よ",
+    "romaji": "yo",
+    "mnemonic": "Looks like a person waving \"yo!\".",
+    "tier": "hiragana_yayuyo",
+    "audio": "hira_yo.mp3"
+  },
+
+  {
+    "id": "hira_ra",
+    "character": "ら",
+    "romaji": "ra",
+    "mnemonic": "A curved hook - \"rah\".",
+    "tier": "hiragana_r",
+    "audio": "hira_ra.mp3"
+  },
+  {
+    "id": "hira_ri",
+    "character": "り",
+    "romaji": "ri",
+    "mnemonic": "Two vertical strokes - \"ree\".",
+    "tier": "hiragana_r",
+    "audio": "hira_ri.mp3"
+  },
+  {
+    "id": "hira_ru",
+    "character": "る",
+    "romaji": "ru",
+    "mnemonic": "A loop like a rolling ball - \"roo\".",
+    "tier": "hiragana_r",
+    "audio": "hira_ru.mp3"
+  },
+  {
+    "id": "hira_re",
+    "character": "れ",
+    "romaji": "re",
+    "mnemonic": "A curved stroke like a bent arm - \"reh\".",
+    "tier": "hiragana_r",
+    "audio": "hira_re.mp3"
+  },
+  {
+    "id": "hira_ro",
+    "character": "ろ",
+    "romaji": "ro",
+    "mnemonic": "A single loop like a road curving - \"roh\".",
+    "tier": "hiragana_r",
+    "audio": "hira_ro.mp3"
+  },
+
+  {
+    "id": "hira_wa",
+    "character": "わ",
+    "romaji": "wa",
+    "mnemonic": "A curled shape like a wave - \"wah\".",
+    "tier": "hiragana_wn",
+    "audio": "hira_wa.mp3"
+  },
+  {
+    "id": "hira_wo",
+    "character": "を",
+    "romaji": "wo",
+    "mnemonic": "Rarely used except as a particle - \"woh\".",
+    "tier": "hiragana_wn",
+    "audio": "hira_wo.mp3"
+  },
+  {
+    "id": "hira_n",
+    "character": "ん",
+    "romaji": "n",
+    "mnemonic": "A single hooked stroke - a nasal \"n\" sound.",
+    "tier": "hiragana_wn",
+    "audio": "hira_n.mp3"
+  }
+]
