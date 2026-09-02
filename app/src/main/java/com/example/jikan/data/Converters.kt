@@ -14,4 +14,10 @@ class Converters {
 
     @TypeConverter
     fun toDailyGoalPreset(value: String): DailyGoalPreset = DailyGoalPreset.valueOf(value)
+
+    @TypeConverter
+    fun fromChallengeType(type: ChallengeType): String = type.name
+
+    @TypeConverter
+    fun toChallengeType(value: String): ChallengeType = ChallengeType.valueOf(value)
 }
