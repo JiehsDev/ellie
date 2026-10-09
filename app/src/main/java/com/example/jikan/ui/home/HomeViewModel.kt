@@ -5,6 +5,8 @@ import android.graphics.drawable.Drawable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.jikan.data.AppDatabase
+import com.example.jikan.data.DailyGoalPreset
+import com.example.jikan.data.EarnRule
 import com.example.jikan.data.Session
 import com.example.jikan.data.ThemeMode
 import com.example.jikan.data.UserSettings
@@ -46,7 +48,10 @@ data class LockedAppChip(
 data class HomeUiState(
     val userName: String = "",
     val walletBalanceMinutes: Int = 0,
+    val lifetimeEarnedMinutes: Int = 0,
     val maxBalanceMinutes: Int = Wallet.MAX_BALANCE_MINUTES,
+    val coachMood: CoachMood = CoachMood.Calm,
+    val earningRules: List<EarnRule> = emptyList(),
     val streakDays: Int = 0,
     val cardsLearned: Int = 0,
     val totalCards: Int = 0,
@@ -54,6 +59,8 @@ data class HomeUiState(
     val minutesSpentToday: Int = 0,
     val lockedApps: List<LockedAppChip> = emptyList(),
     val lockedAppCount: Int = 0,
+    val dailyGoalMinutes: Int = 45,
+    val sessionLengthMinutes: Int = 12,
     val week: List<StudyDay> = emptyList(),
     val protectionOn: Boolean = true,
     val batteryOptimizationsIgnored: Boolean = true,
@@ -98,6 +105,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         observeStats()
         observeLockedApps()
         observeScreenTime()
+        observeEarningRules()
+    }
+
+    private fun observeEarningRules() {
+        viewModelScope.launch {
+            db.earnRuleDao().observeAll().collect { rules ->
+                _state.update { it.copy(earningRules = rules) }
+            }
+        }
     }
 
     private fun observeStats() {
@@ -125,6 +141,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     bankingModeActive = settings?.bankingModeActive ?: false,
                     lastViolationAtMs = settings?.lastViolationAtMs ?: 0L,
                     lockedAppCount = lockedApps.size,
+                    dailyGoalMinutes = when (settings?.dailyGoalPreset) {
+                        DailyGoalPreset.SERIOUS -> 45
+                        else -> 30
+                    },
+                    sessionLengthMinutes = settings?.sessionLengthMinutes ?: 12,
                 )
             }
 
@@ -148,21 +169,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         bankingModeActive = snapshot.bankingModeActive,
                         lastViolationAtMs = snapshot.lastViolationAtMs,
                         walletBalanceMinutes = snapshot.wallet?.creditBalanceMinutes ?: 0,
+                        lifetimeEarnedMinutes = snapshot.wallet?.lifetimeCreditsEarned ?: 0,
                         streakDays = snapshot.wallet?.currentStreakDays ?: 0,
                         cardsLearned = snapshot.cardsLearned,
                         totalCards = totalCards,
                         dueCount = snapshot.dueCount,
                         minutesSpentToday = spentToday,
                         lockedAppCount = snapshot.lockedAppCount,
+                        dailyGoalMinutes = snapshot.dailyGoalMinutes,
+                        sessionLengthMinutes = snapshot.sessionLengthMinutes,
                         week = week,
                         isLoading = false,
                     )
-                    updated.copy(
-                        coachMessage = coachMessageFor(
-                            state = updated,
-                            studiedTodayMinutes = studiedToday,
-                            studiedYesterdayMinutes = studiedYesterday,
-                        )
+                    withCoachMessage(
+                        updated,
+                        studiedTodayMinutes = studiedToday,
+                        studiedYesterdayMinutes = studiedYesterday,
                     )
                 }
             }
@@ -206,7 +228,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         _state.update {
             val updated = it.copy(screenTimeSummary = summary)
-            updated.copy(coachMessage = coachMessageFor(updated))
+            withCoachMessage(updated)
         }
     }
 
@@ -222,7 +244,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val batteryIgnored = PermissionStatus.isIgnoringBatteryOptimizations(getApplication())
             _state.update {
                 val updated = it.copy(protectionOn = enabled, batteryOptimizationsIgnored = batteryIgnored)
-                updated.copy(coachMessage = coachMessageFor(updated))
+                withCoachMessage(updated)
             }
             refreshScreenTime()
         }
@@ -231,7 +253,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun disableLockingForBanking() {
         _state.update {
             val updated = it.copy(bankingModeStatus = BankingModeStatus.Selecting)
-            updated.copy(coachMessage = coachMessageFor(updated))
+            withCoachMessage(updated)
         }
     }
 
@@ -242,7 +264,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun startFullDisableBankingMode(durationMinutes: Int) {
         _state.update {
             val updated = it.copy(bankingModeStatus = BankingModeStatus.Loading)
-            updated.copy(coachMessage = coachMessageFor(updated))
+            withCoachMessage(updated)
         }
         viewModelScope.launch {
             PauseManager.requestAccessibilityDisable(getApplication(), durationMinutes)
@@ -250,7 +272,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             refreshProtectionStatus()
             _state.update {
                 val updated = it.copy(bankingModeStatus = BankingModeStatus.Success)
-                updated.copy(coachMessage = coachMessageFor(updated))
+                withCoachMessage(updated)
             }
         }
     }
@@ -258,7 +280,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissBankingModeStatus() {
         _state.update {
             val updated = it.copy(bankingModeStatus = BankingModeStatus.Idle)
-            updated.copy(coachMessage = coachMessageFor(updated))
+            withCoachMessage(updated)
         }
     }
 
@@ -310,31 +332,44 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
     }
 
-    private fun coachMessageFor(
+    private fun withCoachMessage(
         state: HomeUiState,
         studiedTodayMinutes: Int = state.week.firstOrNull { it.isToday }?.minutes ?: 0,
         studiedYesterdayMinutes: Int = state.week.lastOrNull { !it.isToday }?.minutes ?: 0,
-    ): String {
+    ): HomeUiState {
+        val (message, mood) = coachMessageAndMoodFor(
+            state = state,
+            studiedTodayMinutes = studiedTodayMinutes,
+            studiedYesterdayMinutes = studiedYesterdayMinutes,
+        )
+        return state.copy(coachMessage = message, coachMood = mood)
+    }
+
+    private fun coachMessageAndMoodFor(
+        state: HomeUiState,
+        studiedTodayMinutes: Int,
+        studiedYesterdayMinutes: Int,
+    ): Pair<String, CoachMood> {
         // Phase 6: the coach observes screen-time facts. The most newsworthy
         // current fact becomes the event; the full summary rides along for
         // observational messages.
         val summary = state.screenTimeSummary
-        return HomeCoachMessageProvider.messageFor(
-            CoachInput(
-                userName = state.userName,
-                walletBalanceMinutes = state.walletBalanceMinutes,
-                streakDays = state.streakDays,
-                dueCount = state.dueCount,
-                studiedTodayMinutes = studiedTodayMinutes,
-                studiedYesterdayMinutes = studiedYesterdayMinutes,
-                protectionOn = state.protectionOn,
-                bankingModeActive = state.bankingModeStatus == BankingModeStatus.Success && !state.protectionOn,
-                hourOfDay = Instant.now().atZone(zone).hour,
-                recentEvent = summary?.let { HomeCoachMessageProvider.screenTimeEventFor(it) }
-                    ?: CoachEvent.HomeOpened,
-                screenTime = summary,
-            )
+        val input = CoachInput(
+            userName = state.userName,
+            walletBalanceMinutes = state.walletBalanceMinutes,
+            streakDays = state.streakDays,
+            dueCount = state.dueCount,
+            studiedTodayMinutes = studiedTodayMinutes,
+            studiedYesterdayMinutes = studiedYesterdayMinutes,
+            protectionOn = state.protectionOn,
+            bankingModeActive = state.bankingModeStatus == BankingModeStatus.Success && !state.protectionOn,
+            hourOfDay = Instant.now().atZone(zone).hour,
+            recentEvent = summary?.let { HomeCoachMessageProvider.screenTimeEventFor(it) }
+                ?: CoachEvent.HomeOpened,
+            screenTime = summary,
         )
+        return HomeCoachMessageProvider.messageFor(input) to
+            HomeCoachMessageProvider.moodFor(input)
     }
 
     private data class CoreSnapshot(
@@ -349,6 +384,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val bankingModeActive: Boolean,
         val lastViolationAtMs: Long,
         val lockedAppCount: Int,
+        val dailyGoalMinutes: Int,
+        val sessionLengthMinutes: Int,
     )
 
     private companion object {
