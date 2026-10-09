@@ -53,7 +53,7 @@ fun BatteryPermissionScreen(
         if (OemBatteryHints.showsAutostartNote(manufacturer)) {
             Spacer(Modifier.height(24.dp))
             Text(
-                text = "On $manufacturer phones, also enable \"Autostart\" for Jikan so it can keep running.",
+                text = "On $manufacturer phones, also enable \"Autostart\" for Ellie so it can keep running.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(12.dp))

@@ -100,7 +100,7 @@ private fun EarningAppsScreenContent(
             Text(text = "Earning apps", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Pick apps that earn you minutes. Jikan measures foreground time — " +
+                text = "Pick apps that earn you minutes. Ellie measures foreground time — " +
                     "how long the app stays open on your screen. It can't tell whether " +
                     "you finished a lesson, only that the app was active.",
                 style = MaterialTheme.typography.bodyMedium,

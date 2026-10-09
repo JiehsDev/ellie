@@ -325,7 +325,7 @@ fun RulesScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "By tying frivolous digital engagement directly to cognitive rigor, Jikan turns unconscious reflexive checking into an intentional choice.",
+                text = "By tying frivolous digital engagement directly to cognitive rigor, Ellie turns unconscious reflexive checking into an intentional choice.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp,
