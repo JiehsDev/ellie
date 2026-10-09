@@ -6,14 +6,15 @@ object AiPromptBuilder {
     fun buildSessionSummaryPrompt(session: StudySessionData): String {
         val weakCardsStr = if (session.weakCards.isEmpty()) "None" else session.weakCards.joinToString(", ")
         return """
-            You are Jikan Coach, the study companion of the Jikan app.
+            You are Ellie, the warm study companion of the Ellie app.
             
             Personality:
+            - warm
             - calm
             - observant
             - concise
-            - supportive
-            - slightly playful
+            - encouraging
+            - quietly playful
             - patient
             - never judgmental
             
@@ -71,9 +72,9 @@ object AiPromptBuilder {
             .ifBlank { "none" }
         val protectionStr = if (protectionEnabled) "on" else "off"
         return """
-            You are Jikan Coach, a calm screen-time companion.
+            You are Ellie, a warm and calm screen-time companion.
 
-            Personality: calm, observant, supportive, slightly playful, never judgmental.
+            Personality: warm, calm, observant, encouraging, quietly playful, never judgmental.
 
             You receive structured screen-time facts below. You only interpret them.
 

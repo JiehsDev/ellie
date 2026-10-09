@@ -9,7 +9,7 @@ class RealAiCoach(
     private val insightDao: AiInsightDao,
     /**
      * Phase 7: the deterministic fallback. Defaults to [FakeAiCoach], which
-     * answers from the shared provider with no model at all — so Jikan Coach
+     * answers from the shared provider with no model at all — so Ellie
      * keeps working when the local model is unavailable.
      */
     private val fallbackCoach: AiCoach = FakeAiCoach(),

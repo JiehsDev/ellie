@@ -349,7 +349,7 @@ object PauseManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 "jikan_reminder_channel",
-                "Jikan Reminders",
+                "Ellie Reminders",
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = "Shows gentle reminders for lightly restricted apps"
@@ -362,7 +362,7 @@ object PauseManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Jikan Locking",
+                "Ellie Locking",
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
                 description = "Shows app locking status and pause controls"

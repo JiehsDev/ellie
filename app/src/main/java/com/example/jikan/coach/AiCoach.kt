@@ -9,7 +9,7 @@ interface AiCoach {
      *
      * The local model is optional. Implementations must return a
      * deterministic fallback message when the model is unavailable, slow,
-     * or misbehaving — Jikan Coach keeps working either way. The model only
+     * or misbehaving — Ellie keeps working either way. The model only
      * interprets the supplied [ScreenTimeContext]; it never decides blocks,
      * protection state, wallet accounting, or usage math.
      */
