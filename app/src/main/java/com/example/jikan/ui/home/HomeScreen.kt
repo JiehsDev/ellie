@@ -2,14 +2,13 @@ package com.example.jikan.ui.home
 
 import android.content.Intent
 import android.provider.Settings
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,69 +17,77 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Canvas
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.jikan.ui.theme.JikanTheme
-import com.example.jikan.ui.coach.JikanCoachMessage
-import com.example.jikan.ui.theme.IconChip
-import com.example.jikan.ui.theme.NeoCard
-import com.example.jikan.ui.theme.PillButton
-import com.example.jikan.ui.theme.RadiusMd
-import com.example.jikan.ui.theme.RadiusSm
-import com.example.jikan.ui.theme.neoRaised
+import com.example.jikan.R
+import com.example.jikan.data.EarnRule
 import com.example.jikan.data.ThemeMode
-import com.example.jikan.screentime.AppUsageStatus
-import com.example.jikan.screentime.ApproachingAppUsage
-import com.example.jikan.screentime.DayUsage
-import com.example.jikan.screentime.ScreenTimeAppUsage
-import com.example.jikan.screentime.ScreenTimeSummary
-import com.example.jikan.screentime.UsageChange
-import com.example.jikan.screentime.UsageChangeDirection
 import com.example.jikan.service.PauseManager
-import java.time.LocalDate
-import java.time.LocalTime
+import com.example.jikan.ui.theme.RadiusMd
+import java.time.Instant
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@Composable
+/**
+ * Stitch reference implementation: the home screen is the study-to-unlock
+ * mission control. Dark forest-charcoal theme, section order: greeting,
+ * JikanCoach, screen credit, study CTA, daily rhythm, earning rules,
+ * locked apps.
+ *
+ * All numbers come from real app state (wallet, study, usage stats,
+ * earning rules, locked apps). The reference's figures are illustrative.
+ */
 fun HomeScreen(
     onStudyNow: () -> Unit,
     onOpenLockedApps: () -> Unit,
     onOpenEarningApps: () -> Unit,
     onOpenRestrictedApps: () -> Unit,
     onOpenInsights: () -> Unit,
+    onOpenCoach: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    var showThemeDialog by remember { mutableStateOf(false) }
 
     // The user leaves the app to flip the accessibility toggle, so re-check on return.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshProtectionStatus() }
@@ -92,12 +99,12 @@ fun HomeScreen(
         onOpenEarningApps = onOpenEarningApps,
         onOpenRestrictedApps = onOpenRestrictedApps,
         onOpenInsights = onOpenInsights,
-        onDisableLockingForBanking = viewModel::disableLockingForBanking,
+        onOpenCoach = onOpenCoach,
+        onOpenThemeSettings = { showThemeDialog = true },
         onStartBankingAllowlist = viewModel::startBankingAllowlist,
         onStartFullDisableBankingMode = viewModel::startFullDisableBankingMode,
         onDismissBankingModeStatus = viewModel::dismissBankingModeStatus,
         onOpenAccessibilitySettings = { PauseManager.openAccessibilitySettings(context) },
-        onSetThemeMode = viewModel::setThemeMode,
         onFixProtection = {
             context.startActivity(
                 Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -110,6 +117,26 @@ fun HomeScreen(
         },
         modifier = modifier,
     )
+
+    if (showThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            title = { Text("Theme") },
+            text = {
+                ThemeModeSelector(
+                    selected = state.themeMode,
+                    onSelect = {
+                        viewModel.setThemeMode(it)
+                        showThemeDialog = false
+                    },
+                )
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showThemeDialog = false }) { Text("Close") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -120,18 +147,16 @@ private fun HomeScreenContent(
     onOpenEarningApps: () -> Unit,
     onOpenRestrictedApps: () -> Unit,
     onOpenInsights: () -> Unit,
-    onDisableLockingForBanking: () -> Unit,
+    onOpenCoach: () -> Unit,
+    onOpenThemeSettings: () -> Unit,
     onStartBankingAllowlist: (String, String, Int) -> Unit,
     onStartFullDisableBankingMode: (Int) -> Unit,
     onDismissBankingModeStatus: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
-    onSetThemeMode: (ThemeMode) -> Unit,
     onFixProtection: () -> Unit,
     onFixBattery: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Rendering the default state before the first read would claim zero minutes, no
-    // streak and no locked apps — indistinguishable from having lost everything.
     if (state.isLoading) {
         Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
         return
@@ -149,228 +174,361 @@ private fun HomeScreenContent(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 8.dp, bottom = 32.dp),
+            .padding(top = 12.dp, bottom = 28.dp),
     ) {
-        HomeHeader(
-            userName = state.userName,
-            onDisableLockingForBanking = onDisableLockingForBanking,
-            showBankingMode = state.protectionOn,
+        TopBar(
+            lifetimeEarnedMinutes = state.lifetimeEarnedMinutes,
+            onOpenThemeSettings = onOpenThemeSettings,
+            onOpenInsights = onOpenInsights,
         )
-
-        if (state.coachMessage.isNotBlank()) {
-            Spacer(Modifier.height(20.dp))
-            JikanCoachMessage(
-                message = state.coachMessage,
-                onClick = if (state.bankingModeStatus == BankingModeStatus.Success && !state.protectionOn) {
-                    onOpenAccessibilitySettings
-                } else {
-                    null
-                },
-            )
-        }
 
         Spacer(Modifier.height(18.dp))
-        ProtectionStatusPill(
-            protectionOn = state.protectionOn,
-            bankingModeActive = state.bankingModeActive || state.bankingDisabledUntilMs > System.currentTimeMillis(),
-            onFixProtection = onFixProtection,
-        )
+        GreetingHeader(state = state)
+
+        if (state.coachMessage.isNotBlank()) {
+            Spacer(Modifier.height(16.dp))
+            CoachCard(message = state.coachMessage, mood = state.coachMood, onClick = onOpenCoach)
+        }
 
         if (!state.protectionOn) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
             ProtectionBanner(onFix = onFixProtection)
         }
 
         if (state.protectionOn && !state.batteryOptimizationsIgnored) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
             BatteryWarningBanner(onFix = onFixBattery)
         }
 
         if (state.strictModeEnabled || state.bankingModeActive || state.bankingDisabledUntilMs > System.currentTimeMillis()) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
             StrictStatusBanner(state = state)
         }
 
-        // Phase 8 dashboard: screen-time control center. Screen-time sections
-        // render only when the summary is available (usage access granted).
-        val summary = state.screenTimeSummary
+        Spacer(Modifier.height(16.dp))
+        CreditCard(state = state)
 
-        if (summary != null) {
-            Spacer(Modifier.height(18.dp))
-            ScreenTimeHero(summary = summary, onOpenInsights = onOpenInsights)
-        }
+        Spacer(Modifier.height(16.dp))
+        StudyCta(state = state, onStudyNow = onStudyNow)
 
-        Spacer(Modifier.height(18.dp))
-        WalletPanel(
-            minutes = state.walletBalanceMinutes,
-            maxMinutes = state.maxBalanceMinutes,
-            lockedAppCount = state.lockedAppCount,
+        Spacer(Modifier.height(22.dp))
+        DailyRhythm(state = state)
+
+        Spacer(Modifier.height(22.dp))
+        EarningRulesSection(state = state, onManage = onOpenEarningApps)
+
+        Spacer(Modifier.height(22.dp))
+        LockedAppsSection(
+            state = state,
+            onEditLimits = onOpenLockedApps,
+            onOpenRestrictedApps = onOpenRestrictedApps,
         )
 
         Spacer(Modifier.height(14.dp))
-        PillButton(
-            text = if (state.dueCount > 0) "Study now · ${state.dueCount} due" else "Study now",
-            onClick = onStudyNow,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        if (summary != null) {
-            Spacer(Modifier.height(22.dp))
-            TopAppsSection(summary = summary)
-        }
-
-        Spacer(Modifier.height(24.dp))
-        EarningSection(summary = summary, onEdit = onOpenEarningApps)
-
-        Spacer(Modifier.height(24.dp))
-        AppLimitsSection(summary = summary, onEdit = onOpenRestrictedApps)
-
-        Spacer(Modifier.height(24.dp))
-        LockedAppsSection(
-            apps = state.lockedApps,
-            lockedCount = state.lockedAppCount,
-            onEdit = onOpenLockedApps,
-        )
-
-        Spacer(Modifier.height(24.dp))
-        QuickActions(
-            dueCount = state.dueCount,
-            walletBalanceMinutes = state.walletBalanceMinutes,
-            lockedAppCount = state.lockedAppCount,
-            onStudyNow = onStudyNow,
-            onOpenLockedApps = onOpenLockedApps,
-            onBankingMode = onDisableLockingForBanking,
-        )
-
-        if (summary != null && summary.weeklyTrend.isNotEmpty()) {
-            Spacer(Modifier.height(24.dp))
-            ScreenTimeWeekStrip(summary = summary)
-        }
-
-        Spacer(Modifier.height(24.dp))
-        ThemeModeSelector(
-            selected = state.themeMode,
-            onSelect = onSetThemeMode,
+        InfoNote(
+            text = "Apps stay locked until you earn credits or complete approved reviews."
         )
     }
 }
 
+// ---------------------------------------------------------------------------
+// Top bar
+// ---------------------------------------------------------------------------
+
 @Composable
-private fun ProtectionStatusPill(
-    protectionOn: Boolean,
-    bankingModeActive: Boolean,
-    onFixProtection: () -> Unit,
+private fun TopBar(
+    lifetimeEarnedMinutes: Int,
+    onOpenThemeSettings: () -> Unit,
+    onOpenInsights: () -> Unit,
 ) {
-    val active = protectionOn && !bankingModeActive
-    val shape = CircleShape
-    val background = if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer
-    val content = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onErrorContainer
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(background, shape)
-            .clickable(enabled = !active, onClick = onFixProtection)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .background(if (active) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error, CircleShape),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = when {
-                active -> "Protection active"
-                bankingModeActive -> "Protection paused for banking"
-                else -> "Protection off"
-            },
-            style = MaterialTheme.typography.labelLarge,
-            color = content,
-            modifier = Modifier.weight(1f),
-        )
-        if (!active) {
+        Column {
             Text(
-                text = "Turn on",
-                style = MaterialTheme.typography.labelMedium,
-                color = content,
+                text = "JIKAN",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 3.sp,
+            )
+            Text(
+                text = "Home",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        // Lifetime earned pill.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.AccessTime,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "+${lifetimeEarnedMinutes}m",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Icon(
+            imageVector = Icons.Filled.Settings,
+            contentDescription = "Settings",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onOpenThemeSettings)
+                .padding(8.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        Image(
+            painter = painterResource(R.drawable.mascot_jikan_coach),
+            contentDescription = "JikanCoach",
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onOpenInsights),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Greeting
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun GreetingHeader(state: HomeUiState) {
+    val now = Instant.now().atZone(ZoneId.systemDefault())
+    val hour = now.hour
+    val greeting = when (hour) {
+        in 5..11 -> "Good morning"
+        in 12..17 -> "Good afternoon"
+        else -> "Good evening"
+    }
+    val date = now.format(DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.US)).uppercase(Locale.US)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = date,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = greeting,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "${state.walletBalanceMinutes}m balance",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// Coach card
+// ---------------------------------------------------------------------------
+
+private fun moodPillText(mood: CoachMood): String = when (mood) {
+    CoachMood.Proud -> "Rhythm on track"
+    CoachMood.Calm -> "Steady"
+    CoachMood.Playful -> "In the zone"
+    CoachMood.Focused -> "Locked in"
+    CoachMood.Concerned -> "Needs attention"
+    CoachMood.WelcomeBack -> "Welcome back"
+}
+
 @Composable
-private fun WalletPanel(
-    minutes: Int,
-    maxMinutes: Int,
-    lockedAppCount: Int,
-) {
-    val fraction = if (maxMinutes > 0) (minutes / maxMinutes.toFloat()).coerceIn(0f, 1f) else 0f
-    NeoCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(RadiusMd),
-        elevation = 7.dp,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
+private fun CoachCard(message: String, mood: CoachMood, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Column {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Column(modifier = Modifier.weight(1f)) {
+        Image(
+            painter = painterResource(R.drawable.mascot_jikan_coach),
+            contentDescription = "JikanCoach",
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "JikanCoach",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.weight(1f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary),
+                    )
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "CURRENT BALANCE",
+                        text = moodPillText(mood),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = "$minutes",
-                            style = MaterialTheme.typography.displayLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "minutes",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 9.dp),
-                        )
-                    }
                 }
-                Text(
-                    text = "$lockedAppCount locked",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
             }
-            Spacer(Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(fraction)
-                        .height(10.dp)
-                        .background(
-                            if (minutes <= 10) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                            CircleShape,
-                        ),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
-                text = when {
-                    minutes <= 0 -> "Study to earn minutes before locked apps open."
-                    minutes >= maxMinutes -> "Wallet full at $maxMinutes min."
-                    else -> "$minutes of $maxMinutes min available for locked apps."
-                },
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 22.sp,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Screen credit card
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CreditCard(state: HomeUiState) {
+    val balance = state.walletBalanceMinutes
+    val earnedToday = state.screenTimeSummary?.earnedMinutes ?: 0
+    val lowBalance = balance < 10
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(20.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "AVAILABLE SCREEN CREDIT",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp,
+                modifier = Modifier.weight(1f),
+            )
+            if (lowBalance) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.tertiaryContainer)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AccessTime,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "Low balance (${balance}m left)",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = "$balance",
+                style = MaterialTheme.typography.displayLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 64.sp,
+                lineHeight = 64.sp,
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = "minutes remaining",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        LinearProgressIndicator(
+            progress = { (balance.toFloat() / state.maxBalanceMinutes.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(CircleShape),
+            color = MaterialTheme.colorScheme.secondary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "$earnedToday of ${state.maxBalanceMinutes} minutes earned today",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "${state.lockedAppCount} apps currently locked",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -379,348 +537,457 @@ private fun WalletPanel(
 }
 
 // ---------------------------------------------------------------------------
-// Phase 8: screen-time dashboard sections. Plain rows, not nested cards — the
-// wallet panel and coach bubble carry the visual weight on this screen.
+// Study CTA
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ScreenTimeHero(summary: ScreenTimeSummary, onOpenInsights: () -> Unit) {
-    Column {
-        SectionHeader(title = "SCREEN TIME", action = "Insights  →", onAction = onOpenInsights)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Today",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun StudyCta(state: HomeUiState, onStudyNow: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.secondary)
+            .clickable(onClick = onStudyNow)
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.MenuBook,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondary,
+            modifier = Modifier.size(26.dp),
         )
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
-            text = formatMinutes(summary.totalScreenTimeMinutes),
-            style = MaterialTheme.typography.displayLarge,
-            color = MaterialTheme.colorScheme.onBackground,
+            text = "Start study session",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSecondary,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.height(4.dp))
-        val change = summary.recentUsageChange
-        val improved = change.direction == UsageChangeDirection.DOWN && change.deltaMinutes != 0
-        val deltaText = when {
-            summary.previousDayScreenTimeMinutes <= 0 -> "First day of tracking."
-            change.deltaMinutes == 0 -> "Same as yesterday."
-            improved -> "↓ ${formatMinutes(-change.deltaMinutes)} vs yesterday"
-            else -> "↑ ${formatMinutes(change.deltaMinutes)} vs yesterday"
-        }
         Text(
-            text = deltaText,
+            text = "${state.dueCount} reviews • ${state.sessionLengthMinutes} min",
             style = MaterialTheme.typography.bodyMedium,
-            color = if (improved) {
-                MaterialTheme.colorScheme.secondary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            color = MaterialTheme.colorScheme.onSecondary,
         )
     }
 }
 
-private fun formatMinutes(minutes: Int): String {
-    if (minutes < 60) return "${minutes}m"
-    val hours = minutes / 60
-    val rest = minutes % 60
-    return if (rest == 0) "${hours}h" else "${hours}h ${rest}m"
-}
+// ---------------------------------------------------------------------------
+// Daily rhythm
+// ---------------------------------------------------------------------------
 
 @Composable
-private fun TopAppsSection(summary: ScreenTimeSummary) {
-    val topApps = summary.topApps.take(5)
-    if (topApps.isEmpty()) return
-    Column {
-        SectionHeader(title = "TOP APPS", action = null, onAction = null)
-        Spacer(Modifier.height(12.dp))
-        val max = topApps.maxOf { it.minutes }.coerceAtLeast(1)
-        topApps.forEachIndexed { index, app ->
-            TopAppRow(app = app, maxMinutes = max)
-            if (index < topApps.lastIndex) Spacer(Modifier.height(12.dp))
-        }
-    }
-}
+private fun DailyRhythm(state: HomeUiState) {
+    val summary = state.screenTimeSummary
+    val goalMinutes = state.dailyGoalMinutes
+    val studiedToday = state.minutesSpentToday
+    val distractingMinutes = (summary?.totalScreenTimeMinutes ?: 0) - (summary?.earningAppMinutes ?: 0)
+    val overLimits = (summary?.exceededApps?.isNotEmpty() == true) ||
+        (summary?.atLimitApps?.isNotEmpty() == true)
 
-@Composable
-private fun TopAppRow(app: ScreenTimeAppUsage, maxMinutes: Int) {
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = app.appLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground,
+                text = "DAILY RHYTHM",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.sp,
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = formatMinutes(app.minutes),
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Goal: ${goalMinutes}m",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-        ) {
-            Box(
+        Spacer(Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Study time card.
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth((app.minutes / maxMinutes.toFloat()).coerceIn(0f, 1f))
-                    .height(6.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
-            )
+                    .weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(16.dp),
+            ) {
+                Text(
+                    text = "Study time today",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "${studiedToday}m",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = " / ${goalMinutes}m",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                // 5-dot progress.
+                val filled = ((studiedToday.toFloat() / goalMinutes.coerceAtLeast(1).toFloat()) * 5)
+                    .toInt().coerceIn(0, 5)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    repeat(5) { i ->
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (i < filled) MaterialTheme.colorScheme.secondary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            // Distracting apps card.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(16.dp),
+            ) {
+                Text(
+                    text = "Distracting apps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "${distractingMinutes}m",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (overLimits) MaterialTheme.colorScheme.tertiary
+                                else MaterialTheme.colorScheme.secondary
+                            ),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (overLimits) "Over limits" else "Under budget",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// Earning rules
+// ---------------------------------------------------------------------------
+
 @Composable
-private fun EarningSection(summary: ScreenTimeSummary?, onEdit: () -> Unit) {
-    val hasProgress = summary != null &&
-        (summary.earnedMinutes > 0 || summary.earningApps.isNotEmpty())
+private fun EarningRulesSection(state: HomeUiState, onManage: () -> Unit) {
+    val rules = state.earningRules
+    val labels = state.screenTimeSummary?.earningApps?.associate { it.packageName to it.appLabel }
+        .orEmpty()
+
     Column {
-        SectionHeader(
-            title = "EARNING",
-            action = if (hasProgress) "Edit  →" else "Set up  →",
-            onAction = onEdit,
-        )
-        Spacer(Modifier.height(12.dp))
-        if (summary != null && hasProgress) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
-                text = "+${summary.earnedMinutes}m earned today · ${summary.spentMinutes}m spent",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Earning rules",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
             )
-            val earningApps = summary.earningApps.take(3)
-            if (earningApps.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                earningApps.forEachIndexed { index, app ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = app.appLabel,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = "${formatMinutes(app.minutes)} used",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (index < earningApps.lastIndex) Spacer(Modifier.height(8.dp))
-                }
-            }
-        } else {
+            Text(
+                text = if (rules.isEmpty()) "Set up" else "Manage",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable(onClick = onManage),
+            )
+        }
+        if (rules.isEmpty()) {
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = "Pick apps that earn you minutes.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-private enum class LimitRowState { EXCEEDED, AT_LIMIT, APPROACHING }
-
-private data class LimitRow(
-    val appLabel: String,
-    val minutes: Int,
-    val limitMinutes: Int,
-    val state: LimitRowState,
-    val detail: String,
-)
-
-@Composable
-private fun AppLimitsSection(summary: ScreenTimeSummary?, onEdit: () -> Unit) {
-    val rows = buildList {
-        summary?.exceededApps?.forEach {
-            add(
-                LimitRow(
-                    appLabel = it.appLabel,
-                    minutes = it.minutes,
-                    limitMinutes = it.limitMinutes,
-                    state = LimitRowState.EXCEEDED,
-                    detail = "${formatMinutes(it.overLimitMinutes)} over",
-                )
-            )
-        }
-        summary?.atLimitApps?.forEach {
-            add(
-                LimitRow(
-                    appLabel = it.appLabel,
-                    minutes = it.minutes,
-                    limitMinutes = it.limitMinutes,
-                    state = LimitRowState.AT_LIMIT,
-                    detail = "at limit",
-                )
-            )
-        }
-        summary?.approachingApps?.forEach {
-            add(
-                LimitRow(
-                    appLabel = it.appLabel,
-                    minutes = it.minutes,
-                    limitMinutes = it.limitMinutes,
-                    state = LimitRowState.APPROACHING,
-                    detail = "${formatMinutes(it.remainingMinutes)} left",
-                )
-            )
-        }
-    }
-    Column {
-        SectionHeader(
-            title = "APP LIMITS",
-            action = if (rows.isEmpty()) "Set up  →" else "Edit  →",
-            onAction = onEdit,
-        )
-        Spacer(Modifier.height(12.dp))
-        if (rows.isEmpty()) {
-            Text(
-                text = "No limits set yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         } else {
-            rows.forEachIndexed { index, row ->
-                val statusColor = when (row.state) {
-                    LimitRowState.EXCEEDED -> MaterialTheme.colorScheme.error
-                    LimitRowState.AT_LIMIT -> MaterialTheme.colorScheme.tertiary
-                    LimitRowState.APPROACHING -> MaterialTheme.colorScheme.secondary
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(statusColor, CircleShape),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = row.appLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = "${formatMinutes(row.minutes)}/${formatMinutes(row.limitMinutes)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = row.detail,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = statusColor,
-                    )
-                }
-                if (index < rows.lastIndex) Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
+            rules.take(3).forEach { rule ->
+                EarningRuleRow(
+                    rule = rule,
+                    appLabel = labels[rule.packageName] ?: rule.packageName,
+                )
+                Spacer(Modifier.height(10.dp))
             }
         }
     }
 }
 
 @Composable
-private fun ScreenTimeWeekStrip(summary: ScreenTimeSummary) {
-    val week = summary.weeklyTrend.map { day ->
-        StudyDay(
-            initial = LocalDate.ofEpochDay(day.epochDay).dayOfWeek.name.take(1),
-            minutes = day.minutes,
-            isToday = day.epochDay == summary.epochDay,
-        )
+private fun EarningRuleRow(rule: EarnRule, appLabel: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = appLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = rule.packageName.substringAfterLast('.').take(12),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Practice ${rule.requiredMinutes}m → earn ${rule.rewardMinutes}m credits",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (rule.enabled) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondary),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Active",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
-    WeekStrip(week = week, title = "SCREEN TIME THIS WEEK")
 }
 
+// ---------------------------------------------------------------------------
+// Locked apps
+// ---------------------------------------------------------------------------
+
 @Composable
-private fun QuickActions(
-    dueCount: Int,
-    walletBalanceMinutes: Int,
-    lockedAppCount: Int,
-    onStudyNow: () -> Unit,
-    onOpenLockedApps: () -> Unit,
-    onBankingMode: () -> Unit,
+private fun LockedAppsSection(
+    state: HomeUiState,
+    onEditLimits: () -> Unit,
+    onOpenRestrictedApps: () -> Unit,
 ) {
     Column {
-        SectionHeader(title = "QUICK ACTIONS", action = null, onAction = null)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Locked apps",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "${state.lockedAppCount}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "Edit limits",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable(onClick = onOpenRestrictedApps),
+            )
+        }
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionTile(
-                icon = "10",
-                label = "Study",
-                sublabel = if (dueCount > 0) "$dueCount due" else "Start",
-                onClick = onStudyNow,
-                modifier = Modifier.weight(1f),
+        if (state.lockedApps.isEmpty()) {
+            Text(
+                text = "No locked apps yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clickable(onClick = onEditLimits),
             )
-            QuickActionTile(
-                icon = "$",
-                label = "Wallet",
-                sublabel = "$walletBalanceMinutes min",
-                onClick = onStudyNow,
-                modifier = Modifier.weight(1f),
-            )
-            QuickActionTile(
-                icon = "APP",
-                label = "Apps",
-                sublabel = "$lockedAppCount locked",
-                onClick = onOpenLockedApps,
-                modifier = Modifier.weight(1f),
-            )
-            QuickActionTile(
-                icon = "ON",
-                label = "Banking",
-                sublabel = "Pause",
-                onClick = onBankingMode,
-                modifier = Modifier.weight(1f),
-            )
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(end = 8.dp),
+            ) {
+                val visible = state.lockedApps.take(5)
+                items(visible, key = { it.packageName }) { app ->
+                    LockedAppTile(
+                        label = app.label,
+                        iconBitmap = runCatching {
+                            app.icon?.toBitmap()?.asImageBitmap()
+                        }.getOrNull(),
+                    )
+                }
+                if (state.lockedApps.size > 5) {
+                    item {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.clickable(onClick = onEditLimits),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "+${state.lockedApps.size - 5}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = "more",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun QuickActionTile(
-    icon: String,
-    label: String,
-    sublabel: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(RadiusSm)
-    Column(
-        modifier = modifier
-            .height(92.dp)
-            .clip(shape)
-            .neoRaised(shape, elevation = 5.dp)
-            .background(MaterialTheme.colorScheme.surface, shape)
-            .clickable(onClick = onClick)
-            .padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(text = icon, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+private fun LockedAppTile(label: String, iconBitmap: ImageBitmap?) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box {
+            if (iconBitmap != null) {
+                Image(
+                    bitmap = iconBitmap,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiaryContainer)
+                    .padding(4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+        }
         Spacer(Modifier.height(6.dp))
-        Text(text = label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.height(2.dp))
         Text(
-            text = sublabel,
+            text = label.take(10),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
         )
     }
 }
 
 @Composable
+private fun InfoNote(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Info,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 20.sp,
+        )
+    }
+}
+
+
+// ---------------------------------------------------------------------------
+// Preserved system banners and dialogs (unchanged behavior)
+// ---------------------------------------------------------------------------
+
 private fun StrictStatusBanner(state: HomeUiState) {
     val now = System.currentTimeMillis()
     val bankingActive = state.bankingModeActive || state.bankingDisabledUntilMs > now
@@ -765,7 +1032,6 @@ private fun StrictStatusBanner(state: HomeUiState) {
     }
 }
 
-@Composable
 private fun ThemeModeSelector(
     selected: ThemeMode,
     onSelect: (ThemeMode) -> Unit,
@@ -797,7 +1063,6 @@ private fun ThemeModeSelector(
     }
 }
 
-@Composable
 private fun BankingModeDialog(
     status: BankingModeStatus,
     lockedApps: List<LockedAppChip>,
@@ -850,53 +1115,6 @@ private fun BankingModeDialog(
     }
 }
 
-@Composable
-private fun HomeHeader(
-    userName: String,
-    onDisableLockingForBanking: () -> Unit,
-    showBankingMode: Boolean,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Greeting(userName = userName, modifier = Modifier.weight(1f))
-        if (showBankingMode) {
-            IconChip(onClick = onDisableLockingForBanking) {
-                Text(
-                    text = "$",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun Greeting(userName: String, modifier: Modifier = Modifier) {
-    val today = LocalDate.now()
-    val hour = LocalTime.now().hour
-    val partOfDay = when {
-        hour < 12 -> "Good morning"
-        hour < 18 -> "Good afternoon"
-        else -> "Good evening"
-    }
-    Column(modifier = modifier) {
-        Text(
-            text = today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())).uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = if (userName.isBlank()) partOfDay else "$partOfDay, $userName",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-    }
-}
-
-@Composable
 private fun ProtectionBanner(onFix: () -> Unit) {
     val shape = RoundedCornerShape(RadiusMd)
     Column(
@@ -931,7 +1149,6 @@ private fun ProtectionBanner(onFix: () -> Unit) {
     }
 }
 
-@Composable
 private fun BatteryWarningBanner(onFix: () -> Unit) {
     val shape = RoundedCornerShape(RadiusMd)
     Column(
@@ -962,310 +1179,6 @@ private fun BatteryWarningBanner(onFix: () -> Unit) {
                 .background(MaterialTheme.colorScheme.tertiary, CircleShape)
                 .clickable(onClick = onFix)
                 .padding(horizontal = 20.dp, vertical = 10.dp),
-        )
-    }
-}
-
-
-
-/**
- * The screen's one bold element: minutes left drawn as a depleting ring, echoing the
- * hourglass in the app's mark. The arc makes the 60-minute ceiling legible in a way a
- * bare number can't, and turns vermillion when the balance is nearly gone.
- */
-@Composable
-private fun TimeDial(
-    minutes: Int,
-    maxMinutes: Int,
-    modifier: Modifier = Modifier,
-) {
-    val fraction = if (maxMinutes > 0) (minutes / maxMinutes.toFloat()).coerceIn(0f, 1f) else 0f
-    val sweep by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = tween(durationMillis = 900),
-        label = "dialSweep",
-    )
-    val isLow = minutes <= 10
-    val arcColor = if (isLow) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
-        Box(contentAlignment = Alignment.Center) {
-            Canvas(
-                modifier = Modifier
-                    .size(212.dp)
-                    .neoRaised(CircleShape, elevation = 10.dp)
-                    .background(MaterialTheme.colorScheme.background, CircleShape),
-            ) {
-                val stroke = 18.dp.toPx()
-                val inset = stroke / 2 + 18.dp.toPx()
-                val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
-                val topLeft = Offset(inset, inset)
-                drawArc(
-                    color = trackColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                )
-                if (sweep > 0f) {
-                    drawArc(
-                        color = arcColor,
-                        startAngle = -90f,
-                        sweepAngle = 360f * sweep,
-                        useCenter = false,
-                        topLeft = topLeft,
-                        size = arcSize,
-                        style = Stroke(width = stroke, cap = StrokeCap.Round),
-                    )
-                }
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "$minutes",
-                    style = MaterialTheme.typography.displayLarge,
-                    color = if (isLow) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onBackground,
-                )
-                Text(
-                    text = "MINUTES LEFT",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = when {
-                minutes <= 0 -> "Study to earn your first minutes."
-                minutes >= maxMinutes -> "Wallet full — $maxMinutes min is the cap."
-                else -> "of $maxMinutes min max"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun LockedAppsSection(apps: List<LockedAppChip>, lockedCount: Int, onEdit: () -> Unit) {
-    Column {
-        SectionHeader(
-            title = "LOCKED APPS",
-            action = if (lockedCount == 0) "Choose apps  →" else "Edit  →",
-            onAction = onEdit,
-        )
-        Spacer(Modifier.height(14.dp))
-        if (lockedCount == 0) {
-            Text(
-                text = "Nothing is locked yet, so nothing costs you time.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable(onClick = onEdit),
-            ) {
-                apps.take(MAX_VISIBLE_APPS).forEach { app -> AppIcon(app) }
-                if (apps.size > MAX_VISIBLE_APPS) {
-                    Text(
-                        text = "+${apps.size - MAX_VISIBLE_APPS}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppIcon(app: LockedAppChip) {
-    val shape = RoundedCornerShape(RadiusSm)
-    val icon = app.icon
-    if (icon != null) {
-        Image(
-            bitmap = icon.toBitmap().asImageBitmap(),
-            contentDescription = app.label,
-            modifier = Modifier
-                .size(42.dp)
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceVariant, shape),
-        )
-    } else {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, shape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = app.label.take(1).uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-fun WeekStrip(week: List<StudyDay>, title: String) {
-    val peak = (week.maxOfOrNull { it.minutes } ?: 0).coerceAtLeast(1)
-    Column {
-        SectionHeader(title = title, action = null, onAction = null)
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            week.forEach { day ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier.height(BAR_TRACK_HEIGHT),
-                        contentAlignment = Alignment.BottomCenter,
-                    ) {
-                        val ratio = day.minutes / peak.toFloat()
-                        val barHeight = (BAR_TRACK_HEIGHT.value * ratio).dp.coerceAtLeast(4.dp)
-                        Box(
-                            modifier = Modifier
-                                .width(22.dp)
-                                .height(barHeight)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    when {
-                                        // Warm family throughout: a faint tan mark for days with
-                                        // nothing, warm grey for past study, indigo for today.
-                                        day.minutes == 0 -> MaterialTheme.colorScheme.outline
-                                        day.isToday -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                ),
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = day.initial,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (day.isToday) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String, action: String?, onAction: (() -> Unit)?) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (action != null && onAction != null) {
-            Text(
-                text = action,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable(onClick = onAction),
-            )
-        }
-    }
-}
-
-private const val MAX_VISIBLE_APPS = 5
-private val BAR_TRACK_HEIGHT = 64.dp
-
-@Preview(showBackground = true, heightDp = 900)
-@Composable
-private fun HomeScreenPreview() {
-    JikanTheme {
-        HomeScreenContent(
-            state = HomeUiState(
-                userName = "Jieh",
-                walletBalanceMinutes = 19,
-                streakDays = 7,
-                cardsLearned = 42,
-                totalCards = 71,
-                dueCount = 8,
-                minutesSpentToday = 12,
-                lockedApps = listOf(
-                    LockedAppChip("com.a", "Loopy", null),
-                    LockedAppChip("com.b", "Chatterbox", null),
-                    LockedAppChip("com.c", "Scrollr", null),
-                ),
-                lockedAppCount = 3,
-                isLoading = false,
-                week = listOf(
-                    StudyDay("M", 8, false),
-                    StudyDay("T", 14, false),
-                    StudyDay("W", 5, false),
-                    StudyDay("T", 0, false),
-                    StudyDay("F", 18, false),
-                    StudyDay("S", 11, false),
-                    StudyDay("S", 6, true),
-                ),
-                protectionOn = false,
-                themeMode = ThemeMode.SYSTEM,
-                screenTimeSummary = ScreenTimeSummary(
-                    epochDay = 10L,
-                    totalScreenTimeMinutes = 201,
-                    previousDayScreenTimeMinutes = 224,
-                    averageDailyScreenTimeMinutes = 210,
-                    restrictedAppMinutes = 134,
-                    earningAppMinutes = 31,
-                    earnedMinutes = 15,
-                    spentMinutes = 20,
-                    walletBalanceMinutes = 10,
-                    topApps = listOf(
-                        ScreenTimeAppUsage("com.youtube", "YouTube", 71, 35.3f, AppUsageStatus.GENERAL),
-                        ScreenTimeAppUsage("com.tiktok", "TikTok", 42, 20.9f, AppUsageStatus.GENERAL),
-                        ScreenTimeAppUsage("com.chrome", "Chrome", 31, 15.4f, AppUsageStatus.GENERAL),
-                    ),
-                    approachingApps = listOf(
-                        ApproachingAppUsage("com.tiktok", "TikTok", 24, 30, 6, 80f),
-                    ),
-                    earningApps = listOf(
-                        ScreenTimeAppUsage("com.duolingo", "Duolingo", 6, 3f, AppUsageStatus.EARNING),
-                    ),
-                    weeklyTrend = listOf(
-                        DayUsage(4L, 180),
-                        DayUsage(5L, 240),
-                        DayUsage(6L, 150),
-                        DayUsage(7L, 300),
-                        DayUsage(8L, 190),
-                        DayUsage(9L, 224),
-                        DayUsage(10L, 201),
-                    ),
-                    recentUsageChange = UsageChange(-23, -10.3f, UsageChangeDirection.DOWN),
-                ),
-            ),
-            onStudyNow = {},
-            onOpenLockedApps = {},
-            onOpenEarningApps = {},
-            onOpenRestrictedApps = {},
-            onOpenInsights = {},
-            onDisableLockingForBanking = {},
-            onStartBankingAllowlist = { _, _, _ -> },
-            onStartFullDisableBankingMode = {},
-            onDismissBankingModeStatus = {},
-            onOpenAccessibilitySettings = {},
-            onSetThemeMode = {},
-            onFixProtection = {},
-            onFixBattery = {},
         )
     }
 }
