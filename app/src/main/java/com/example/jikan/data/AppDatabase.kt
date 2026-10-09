@@ -170,8 +170,7 @@ private val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
-private val MIGRATION_11_12 = object : Migration(11, 12) {
-    override fun migrate(db: SupportSQLiteDatabase) {
+private val MIGRATION_11_12 = object : Migration(11, 12) {    override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `wallet_transactions` ADD COLUMN `source` TEXT NOT NULL DEFAULT 'UNKNOWN'")
         db.execSQL("ALTER TABLE `wallet_transactions` ADD COLUMN `ruleId` INTEGER")
         db.execSQL("ALTER TABLE `wallet_transactions` ADD COLUMN `qualifyingMinutes` INTEGER")
@@ -184,6 +183,24 @@ private val MIGRATION_11_12 = object : Migration(11, 12) {
                 "`rewardedBlocks` INTEGER NOT NULL, " +
                 "`updatedAtMs` INTEGER NOT NULL, " +
                 "PRIMARY KEY(`ruleId`, `epochDay`))"
+        )
+    }
+}
+
+/**
+ * Phase 4: generic app restrictions. Adds the app_restrictions table holding
+ * one user-configured daily limit per package, independent of locked_apps
+ * tiers and earn_rules.
+ */
+private val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `app_restrictions` (" +
+                "`packageName` TEXT NOT NULL, " +
+                "`appLabel` TEXT NOT NULL, " +
+                "`dailyLimitMinutes` INTEGER NOT NULL, " +
+                "`enabled` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`packageName`))"
         )
     }
 }
@@ -205,8 +222,9 @@ private val MIGRATION_11_12 = object : Migration(11, 12) {
         EarnRule::class,
         WalletTransaction::class,
         EarningAppProgress::class,
+        AppRestriction::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -226,6 +244,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun earnRuleDao(): EarnRuleDao
     abstract fun walletTransactionDao(): WalletTransactionDao
     abstract fun earningAppProgressDao(): EarningAppProgressDao
+    abstract fun appRestrictionDao(): AppRestrictionDao
 
     companion object {
         @Volatile
@@ -249,6 +268,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_9_10,
                         MIGRATION_10_11,
                         MIGRATION_11_12,
+                        MIGRATION_12_13,
                     )
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()

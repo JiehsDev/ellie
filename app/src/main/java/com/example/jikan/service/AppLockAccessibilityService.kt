@@ -11,13 +11,22 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.example.jikan.data.AppDatabase
+import com.example.jikan.data.AppRestriction
+import com.example.jikan.data.AppRestrictionDao
 import com.example.jikan.data.AppUsage
 import com.example.jikan.data.AppUsageDao
 import com.example.jikan.data.LockTier
 import com.example.jikan.data.Wallet
 import com.example.jikan.data.WalletDao
 import com.example.jikan.lock.RedirectGate
+import com.example.jikan.screentime.AllowReason
+import com.example.jikan.screentime.AndroidUsageStatsDataSource
+import com.example.jikan.screentime.AppRestrictionPolicy
+import com.example.jikan.screentime.AppUsageAggregator
 import com.example.jikan.screentime.EarningSessionTracker
+import com.example.jikan.screentime.RestrictionCheckInput
+import com.example.jikan.screentime.RestrictionDecision
+import com.example.jikan.screentime.UsageStatsDataSource
 import com.example.jikan.ui.lock.LockActivity
 import com.example.jikan.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -31,7 +40,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Detects when a locked app comes to the foreground and, if the wallet can't
@@ -55,6 +66,9 @@ class AppLockAccessibilityService : AccessibilityService() {
     @Volatile private var walletBalance: Int = 0
     @Volatile private var isPaused: Boolean = false
     @Volatile private var currentForegroundPackage: String? = null
+    // Phase 4: generic app restrictions, independent of lock tiers.
+    @Volatile private var restrictionsMap: Map<String, AppRestriction> = emptyMap()
+    @Volatile private var strictModeEnabled: Boolean = false
 
     private val lastReminderTimeMap = mutableMapOf<String, Long>()
     private val lastForceCloseTimeMap = mutableMapOf<String, Long>()
@@ -62,7 +76,14 @@ class AppLockAccessibilityService : AccessibilityService() {
     private lateinit var walletDao: WalletDao
     private lateinit var appUsageDao: AppUsageDao
     private lateinit var earningSessionTracker: EarningSessionTracker
+    private lateinit var appRestrictionDao: AppRestrictionDao
+    private lateinit var usageStatsDataSource: UsageStatsDataSource
     private var disableReceiverRegistered = false
+    // Today's per-package foreground minutes, refreshed at most once per
+    // RESTRICTION_USAGE_CACHE_TTL_MS. Concurrent: written on IO, read on main.
+    private val restrictionUsageCache = ConcurrentHashMap<String, Pair<Long, Int>>()
+    private var lastRestrictionEvalPackage: String? = null
+    private var lastRestrictionEvalMs: Long = 0L
 
     private val disableReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -84,7 +105,12 @@ class AppLockAccessibilityService : AccessibilityService() {
     private val spendRunnable = object : Runnable {
         override fun run() {
             val foreground = currentForegroundPackage
-            if (!isPaused && foreground != null && foreground in lockedPackagesMap.keys && walletBalance > 0) {
+            // Locked apps spend while the wallet can pay (existing behavior).
+            // Phase 4: a restricted app at/over its daily limit also spends to
+            // extend access generically — unless strict mode makes it a hard block.
+            if (!isPaused && foreground != null && walletBalance > 0 &&
+                (foreground in lockedPackagesMap.keys || walletExtendsRestriction(foreground))
+            ) {
                 serviceScope.launch {
                     walletDao.spend(SPEND_MINUTES_PER_TICK)
                     recordUsage(foreground, SPEND_MINUTES_PER_TICK)
@@ -114,6 +140,8 @@ class AppLockAccessibilityService : AccessibilityService() {
         walletDao = db.walletDao()
         appUsageDao = db.appUsageDao()
         earningSessionTracker = EarningSessionTracker(db)
+        appRestrictionDao = db.appRestrictionDao()
+        usageStatsDataSource = AndroidUsageStatsDataSource(applicationContext)
         registerDisableReceiver()
 
         db.lockedAppDao().observeLocked()
@@ -126,6 +154,15 @@ class AppLockAccessibilityService : AccessibilityService() {
 
         db.bankingAllowlistDao().observeActive(System.currentTimeMillis())
             .onEach { entries -> bankingAllowlistPackages = entries.map { it.packageName }.toSet() }
+            .launchIn(serviceScope)
+
+        // Phase 4: generic app restrictions + strict-mode flag for the policy.
+        appRestrictionDao.observeEnabled()
+            .onEach { restrictions -> restrictionsMap = restrictions.associateBy { it.packageName } }
+            .launchIn(serviceScope)
+
+        db.settingsDao().observe()
+            .onEach { settings -> strictModeEnabled = settings?.strictModeEnabled == true }
             .launchIn(serviceScope)
 
         db.pauseStateDao().observe()
@@ -157,7 +194,14 @@ class AppLockAccessibilityService : AccessibilityService() {
         }
         if (packageName == this.packageName) return
         if (packageName in bankingAllowlistPackages) return
-        val tier = lockedPackagesMap[packageName] ?: return
+        val tier = lockedPackagesMap[packageName]
+        if (tier == null) {
+            // Phase 4: generic app restrictions are independent of lock tiers.
+            // Locked apps keep the existing tier path below; every other
+            // package is evaluated against its configured daily limit.
+            maybeCheckAppRestriction(packageName)
+            return
+        }
         if (walletBalance > 0) return
         if (isPaused) return
 
@@ -171,6 +215,107 @@ class AppLockAccessibilityService : AccessibilityService() {
                 }
             }
         }
+    }
+
+    /**
+     * Phase 4: evaluates the generic app-restriction policy for packages that
+     * are NOT locked. Throttled to one evaluation per package per
+     * [RESTRICTION_EVAL_DEBOUNCE_MS] (plus on package change) so the 400 ms
+     * poll doesn't hammer UsageStatsManager.
+     */
+    private fun maybeCheckAppRestriction(packageName: String) {
+        val now = System.currentTimeMillis()
+        if (packageName == lastRestrictionEvalPackage && now - lastRestrictionEvalMs < RESTRICTION_EVAL_DEBOUNCE_MS) return
+        lastRestrictionEvalPackage = packageName
+        lastRestrictionEvalMs = now
+        checkAppRestriction(packageName)
+    }
+
+    private fun checkAppRestriction(packageName: String) {
+        val restriction = restrictionsMap[packageName] ?: return
+        if (!restriction.enabled || isPaused) return
+        serviceScope.launch(Dispatchers.IO) {
+            val usageMinutes = dailyUsageMinutes(packageName)
+            val decision = AppRestrictionPolicy.evaluate(
+                restrictionInput(packageName, restriction, usageMinutes)
+            )
+            if (decision is RestrictionDecision.Blocked &&
+                !isPaused && packageName !in bankingAllowlistPackages
+            ) {
+                withContext(Dispatchers.Main.immediate) {
+                    when (val gateDecision = gate.evaluate(packageName)) {
+                        RedirectGate.Decision.Suppressed -> Unit
+                        is RedirectGate.Decision.Redirect ->
+                            redirect(packageName, gateDecision.takeABreak)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun restrictionInput(
+        packageName: String,
+        restriction: AppRestriction,
+        usageMinutes: Int,
+    ) = RestrictionCheckInput(
+        // This service is running, so protection is on; the policy keeps the
+        // branch for other callers (UI previews, unit tests).
+        protectionEnabled = true,
+        isPaused = isPaused,
+        bankingExempt = packageName in bankingAllowlistPackages,
+        strictModeEnabled = strictModeEnabled,
+        restriction = restriction,
+        dailyUsageMinutes = usageMinutes,
+        walletBalanceMinutes = walletBalance,
+        // Locked apps never reach here; they keep the existing tier path.
+        existingLockTier = null,
+    )
+
+    /**
+     * Today's foreground minutes for [packageName] from UsageStatsManager,
+     * cached for [RESTRICTION_USAGE_CACHE_TTL_MS]. Returns 0 when usage
+     * access isn't granted — restrictions then fail open until it is.
+     */
+    private suspend fun dailyUsageMinutes(packageName: String): Int {
+        val now = System.currentTimeMillis()
+        val cached = restrictionUsageCache[packageName]
+        if (cached != null && now - cached.first < RESTRICTION_USAGE_CACHE_TTL_MS) return cached.second
+        val minutes = if (usageStatsDataSource.hasUsageAccess()) {
+            val zone = ZoneId.systemDefault()
+            val startOfDayMs = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
+            usageStatsDataSource.queryUsage(startOfDayMs, now)
+                .firstOrNull { it.packageName == packageName }
+                ?.let { AppUsageAggregator.minutesFromMs(it.foregroundMs) }
+                ?: 0
+        } else {
+            0
+        }
+        restrictionUsageCache[packageName] = now to minutes
+        return minutes
+    }
+
+    private fun cachedUsageMinutes(packageName: String): Int? {
+        val (queriedAtMs, minutes) = restrictionUsageCache[packageName] ?: return null
+        if (System.currentTimeMillis() - queriedAtMs >= RESTRICTION_USAGE_CACHE_TTL_MS) return null
+        return minutes
+    }
+
+    /**
+     * Phase 4: generic wallet extension. A restricted app at/over its daily
+     * limit may keep running while the wallet has minutes — the same
+     * spend-to-extend behavior locked apps already have, generalized beyond
+     * studying. Strict mode makes limits hard: no extension while it is on.
+     */
+    private fun walletExtendsRestriction(packageName: String): Boolean {
+        if (strictModeEnabled) return false
+        val restriction = restrictionsMap[packageName] ?: return false
+        if (!restriction.enabled) return false
+        val usageMinutes = cachedUsageMinutes(packageName) ?: return false
+        if (usageMinutes < restriction.dailyLimitMinutes) return false
+        val decision = AppRestrictionPolicy.evaluate(
+            restrictionInput(packageName, restriction, usageMinutes)
+        )
+        return decision is RestrictionDecision.Allowed && decision.reason == AllowReason.WALLET_EXTENDED
     }
 
     private fun handleLockedPackage(packageName: String, tier: LockTier) {
@@ -272,5 +417,8 @@ class AppLockAccessibilityService : AccessibilityService() {
         private const val SPEND_MINUTES_PER_TICK = 1
         private const val REGEN_TICK_INTERVAL_MS = 10 * 60_000L
         private const val REGEN_MINUTES_PER_TICK = 1
+        // Phase 4: bounds on restriction evaluation + usage-stat caching.
+        private const val RESTRICTION_USAGE_CACHE_TTL_MS = 60_000L
+        private const val RESTRICTION_EVAL_DEBOUNCE_MS = 60_000L
     }
 }

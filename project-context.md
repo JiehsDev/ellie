@@ -118,6 +118,33 @@ Tone:
 
 Strict/protection health states should always win over playful messages. If protection is off, the user needs clear safety-state information first.
 
+## Phase 4: Generic App Restrictions
+
+Implemented 2026-10-09. App restrictions are user-configured daily screen-time
+limits per app, independent of locked-app tiers and earn rules.
+
+- `data/AppRestriction` (`app_restrictions` table, DB v13): `packageName`,
+  `appLabel`, `dailyLimitMinutes`, `enabled`.
+- `screentime/AppRestrictionPolicy`: pure-Kotlin deterministic policy answering
+  "Is this package currently allowed to be opened?" Precedence: protection off
+  > paused > banking exempt > existing lock rule (wallet>0 allowed, else
+  blocked with tier) > restriction (under limit allowed; at/over limit allowed
+  only via generic wallet extension, hard-blocked in strict mode) > no
+  restriction. AI may explain a decision (`RestrictionDecision.explain`); it
+  must never make one.
+- `AppLockAccessibilityService`: non-locked packages are evaluated against
+  their restriction using UsageStatsManager foreground minutes (60 s cache,
+  throttled evaluation). Over-limit blocks redirect through the existing
+  `RedirectGate` → `LockActivity` path. The spend tick also covers
+  wallet-extended restricted apps (1 min/min, recorded in `app_usage`).
+  Existing locked-app behavior is untouched.
+- Tests: `AppRestrictionPolicyTest` (18 cases: below/at/over limit, protection
+  off, paused, banking, strict, wallet states, lock-rule precedence,
+  multi-app independence, explanations).
+
+Not yet built: UI for configuring restrictions (no Home redesign in this
+phase); restrictions require usage-access permission, and fail open without it.
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.
