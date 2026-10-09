@@ -100,6 +100,8 @@ class LlamaCppEngine(context: Context) : InferenceEngine {
             "<|im_end|>",
             "\nUser:",
             "\nStudy data:",
+            // Phase 7: stop the model from echoing the screen-time facts block.
+            "\nScreen-time facts:",
         )
     }
 }

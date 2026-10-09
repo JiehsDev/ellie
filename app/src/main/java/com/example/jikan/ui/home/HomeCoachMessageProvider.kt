@@ -1,5 +1,6 @@
 package com.example.jikan.ui.home
 
+import com.example.jikan.coach.ScreenTimeContext
 import com.example.jikan.data.Wallet
 import com.example.jikan.screentime.ScreenTimeSummary
 
@@ -76,6 +77,25 @@ sealed interface CoachEvent {
     data class EarningCreditGranted(val appLabel: String, val creditsEarned: Int) : CoachEvent
     data object DailySummary : CoachEvent
 }
+
+/**
+ * Phase 7: builds the deterministic provider input for a screen-time
+ * context. Used by the AI coach implementations as the guaranteed fallback
+ * when the local model is unavailable — one mapping, no duplication.
+ */
+fun ScreenTimeContext.toCoachInput(protectionEnabled: Boolean): CoachInput = CoachInput(
+    userName = "",
+    walletBalanceMinutes = walletBalanceMinutes,
+    streakDays = 0,
+    dueCount = 0,
+    studiedTodayMinutes = 0,
+    studiedYesterdayMinutes = 0,
+    protectionOn = protectionEnabled,
+    bankingModeActive = false,
+    hourOfDay = 12,
+    recentEvent = HomeCoachMessageProvider.screenTimeEventFor(this),
+    screenTime = this,
+)
 
 object HomeCoachMessageProvider {
     // Noise gates for observational messages (minutes).

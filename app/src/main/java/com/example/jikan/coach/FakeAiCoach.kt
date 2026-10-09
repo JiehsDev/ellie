@@ -1,5 +1,8 @@
 package com.example.jikan.coach
 
+import com.example.jikan.ui.home.HomeCoachMessageProvider
+import com.example.jikan.ui.home.toCoachInput
+
 class FakeAiCoach : AiCoach {
     override suspend fun summarizeSession(session: StudySessionData): AiStudySummary {
         val summaryText = if (session.accuracyPercent >= 90) {
@@ -13,4 +16,14 @@ class FakeAiCoach : AiCoach {
     override suspend fun explainMistake(cardKana: String, userAnswer: String): String {
         return "For '$cardKana', the correct reading is distinct from '$userAnswer'. Review stroke patterns and audio pronunciation."
     }
+
+    /**
+     * Phase 7: always deterministic — the shared provider message for the
+     * context. Doubles as [RealAiCoach]'s fallback, so the coach works with
+     * no local model at all.
+     */
+    override suspend fun insightForScreenTime(
+        context: ScreenTimeContext,
+        protectionEnabled: Boolean,
+    ): String = HomeCoachMessageProvider.messageFor(context.toCoachInput(protectionEnabled))
 }

@@ -55,18 +55,46 @@ class AiPromptBuilderTest {
             recentUsageChange = UsageChange(-23, -10.3f, UsageChangeDirection.DOWN),
         )
 
-        val prompt = AiPromptBuilder.buildScreenTimeInsightPrompt(summary)
+        val prompt = AiPromptBuilder.buildScreenTimeInsightPrompt(summary, protectionEnabled = true)
 
         // Structured facts only — no arithmetic for the model to do.
+        assertTrue(prompt.contains("You are Jikan Coach, a calm screen-time companion."))
         assertTrue(prompt.contains("Total today: 201 minutes"))
         assertTrue(prompt.contains("Yesterday: 224 minutes"))
         assertTrue(prompt.contains("Wallet balance: 10 minutes"))
+        assertTrue(prompt.contains("Protection: on"))
         assertTrue(prompt.contains("TikTok (48 min)"))
         assertTrue(prompt.contains("TikTok (+12 min)"))
         // Safety guardrails baked into the prompt.
-        assertTrue(prompt.contains("Maximum 2 sentences"))
-        assertTrue(prompt.contains("never judgmental"))
-        assertTrue(prompt.contains("must NEVER decide"))
-        assertTrue(prompt.contains("addicted"))
+        assertTrue(prompt.contains("Never invent statistics."))
+        assertTrue(prompt.contains("Never calculate unsupported facts."))
+        assertTrue(prompt.contains("Never shame the user."))
+        assertTrue(prompt.contains("Never diagnose addiction"))
+        assertTrue(prompt.contains("Never make safety decisions."))
+        assertTrue(prompt.contains("Never override deterministic app restrictions."))
+        assertTrue(prompt.contains("generally 1-2 sentences"))
+    }
+
+    @Test
+    fun testScreenTimeInsightPromptReportsProtectionOff() {
+        val summary = ScreenTimeSummary(
+            epochDay = 10L,
+            totalScreenTimeMinutes = 0,
+            previousDayScreenTimeMinutes = 0,
+            averageDailyScreenTimeMinutes = 0,
+            restrictedAppMinutes = 0,
+            earningAppMinutes = 0,
+            earnedMinutes = 0,
+            spentMinutes = 0,
+            walletBalanceMinutes = 0,
+            topApps = emptyList(),
+            exceededApps = emptyList(),
+            recentUsageChange = UsageChange(0, null, UsageChangeDirection.SAME),
+        )
+
+        val prompt = AiPromptBuilder.buildScreenTimeInsightPrompt(summary, protectionEnabled = false)
+
+        assertTrue(prompt.contains("Protection: off"))
+        assertTrue(prompt.contains("Top apps: none"))
     }
 }

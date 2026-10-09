@@ -194,6 +194,34 @@ architecture preserved and reused: `JikanCoachMessage`, `CoachInput`,
   able to enforce your limits until you turn it back on."); the one existing
   test asserting the old copy was updated.
 
+## Phase 7: Local AI Adapted for Screen Time
+
+Implemented 2026-10-09. Audit verdict: no architecture replacement needed —
+the `InferenceEngine` interface already abstracts the llama.cpp runtime, so it
+(and `LlamaCppEngine`, `ModelManager`) stay untouched apart from one added
+stop sequence. `AiCoach`, `RealAiCoach`, `FakeAiCoach`, `InferenceEngine`,
+`AiPromptBuilder` all preserved and extended.
+
+- `ScreenTimeContext` is a typealias for `ScreenTimeSummary`: the model gets
+  structured facts only, never raw usage events, never arithmetic to do.
+- `AiCoach.insightForScreenTime(context, protectionEnabled)`: new interface
+  method, implemented by both coaches.
+- `RealAiCoach`: 30 s inference timeout; `InsightSanitizer` validates output
+  (blank/echo/rambling trimmed, max 2 sentences / 280 chars). All five failure
+  modes — unavailable, timeout, inference failure, malformed, empty — fall
+  back to the deterministic provider via `FakeAiCoach` (now wired as the
+  default fallback).
+- `AiPromptBuilder.buildScreenTimeInsightPrompt` aligned to the spec: "You
+  are Jikan Coach, a calm screen-time companion.", use-only-supplied-facts,
+  never invent/calculate/shame/diagnose, never safety decisions, never
+  override deterministic restrictions, 1–2 sentences.
+- `HomeCoachMessageProvider.toCoachInput`: one mapping from context to
+  deterministic input, no duplication.
+- Tests: `ScreenTimeAiTest` (17 cases incl. all fallback paths with scripted
+  engines) + extended `AiPromptBuilderTest`. Home keeps its deterministic
+  coach path; the AI path is ready but not yet wired into UI (per "do not
+  redesign UI yet").
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.

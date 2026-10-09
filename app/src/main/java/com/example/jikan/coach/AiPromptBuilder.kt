@@ -47,57 +47,57 @@ object AiPromptBuilder {
     }
 
     /**
-     * Phase 6: screen-time companion prompt. The model receives structured
-     * facts only — all arithmetic is already done by ScreenTimeCalculator.
-     * The deterministic HomeCoachMessageProvider remains the functional
-     * path; the local model is never required.
+     * Phase 7: screen-time companion prompt. The model receives the structured
+     * [ScreenTimeContext] only — all arithmetic is already done by
+     * ScreenTimeCalculator, and raw usage events are never sent. The
+     * deterministic HomeCoachMessageProvider remains the functional path;
+     * the local model is never required.
      */
-    fun buildScreenTimeInsightPrompt(summary: ScreenTimeSummary): String {
-        val topAppsStr = summary.topApps.take(5)
+    fun buildScreenTimeInsightPrompt(
+        context: ScreenTimeContext,
+        protectionEnabled: Boolean,
+    ): String {
+        val topAppsStr = context.topApps.take(5)
             .joinToString(", ") { "${it.appLabel} (${it.minutes} min)" }
             .ifBlank { "none" }
-        val approachingStr = summary.approachingApps
+        val approachingStr = context.approachingApps
             .joinToString(", ") { "${it.appLabel} (${it.remainingMinutes} min left)" }
             .ifBlank { "none" }
-        val atLimitStr = summary.atLimitApps
+        val atLimitStr = context.atLimitApps
             .joinToString(", ") { it.appLabel }
             .ifBlank { "none" }
-        val exceededStr = summary.exceededApps
+        val exceededStr = context.exceededApps
             .joinToString(", ") { "${it.appLabel} (+${it.overLimitMinutes} min)" }
             .ifBlank { "none" }
+        val protectionStr = if (protectionEnabled) "on" else "off"
         return """
-            You are Jikan Coach, the screen-time companion of the Jikan app.
+            You are Jikan Coach, a calm screen-time companion.
 
-            Personality:
-            - calm
-            - observant
-            - supportive
-            - slightly playful
-            - never judgmental
+            Personality: calm, observant, supportive, slightly playful, never judgmental.
 
-            Your purpose is to help the user understand their screen time from
-            the structured facts below. You only interpret these numbers.
+            You receive structured screen-time facts below. You only interpret them.
 
             Hard rules:
-            - Maximum 2 sentences.
-            - Keep responses short and natural.
-            - Do not use guilt, shame, fear, or pressure.
-            - Never say the user is wasting time, addicted, failing, or must stop.
-            - Do not invent statistics. Use only the supplied numbers.
-            - You must NEVER decide: whether an app should be blocked, whether
-              protection should activate, whether the user is addicted, whether
-              a behavior is medically problematic, wallet accounting, or usage
-              calculations. Interpret only.
+            - Use only the supplied facts.
+            - Never invent statistics.
+            - Never calculate unsupported facts.
+            - Never shame the user.
+            - Never diagnose addiction or medical issues.
+            - Never make safety decisions.
+            - Never override deterministic app restrictions.
+            - Produce short responses, generally 1-2 sentences.
+            - Keep the tone calm and supportive.
 
             Screen-time facts:
-            Total today: ${summary.totalScreenTimeMinutes} minutes
-            Yesterday: ${summary.previousDayScreenTimeMinutes} minutes
-            Recent daily average: ${summary.averageDailyScreenTimeMinutes} minutes
-            Restricted-app time: ${summary.restrictedAppMinutes} minutes
-            Earning-app time: ${summary.earningAppMinutes} minutes
-            Earned: ${summary.earnedMinutes} minutes
-            Spent: ${summary.spentMinutes} minutes
-            Wallet balance: ${summary.walletBalanceMinutes} minutes
+            Total today: ${context.totalScreenTimeMinutes} minutes
+            Yesterday: ${context.previousDayScreenTimeMinutes} minutes
+            Recent daily average: ${context.averageDailyScreenTimeMinutes} minutes
+            Restricted-app time: ${context.restrictedAppMinutes} minutes
+            Earning-app time: ${context.earningAppMinutes} minutes
+            Earned: ${context.earnedMinutes} minutes
+            Spent: ${context.spentMinutes} minutes
+            Wallet balance: ${context.walletBalanceMinutes} minutes
+            Protection: $protectionStr
             Top apps: $topAppsStr
             Approaching limits: $approachingStr
             At limit: $atLimitStr
