@@ -76,7 +76,7 @@ fun RhythmScreen(
         ) {
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
@@ -84,7 +84,7 @@ fun RhythmScreen(
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                text = "Jikan Rhythm",
+                text = "Ellie Rhythm",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -258,7 +258,7 @@ fun RhythmScreen(
         ) {
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
