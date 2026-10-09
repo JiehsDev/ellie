@@ -96,7 +96,7 @@ private fun InsightsScreenContent(
                 Text(text = "Insights", style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Jikan needs usage access to explain your screen-time patterns. " +
+                    text = "Ellie needs usage access to explain your screen-time patterns. " +
                         "Grant it in system settings, then come back.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
