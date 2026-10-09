@@ -3,6 +3,7 @@ package com.example.jikan.study
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jikan.coach.AiStudySummary
 import com.example.jikan.coach.LlamaCppEngine
 import com.example.jikan.coach.RealAiCoach
 import com.example.jikan.coach.StudySessionData
@@ -152,10 +153,20 @@ class StudySessionViewModel(application: Application) : AndroidViewModel(applica
                 previousAccuracyPercent = null,
             )
 
-            val inferenceEngine = LlamaCppEngine(getApplication())
-            val coach = RealAiCoach(inferenceEngine, db.aiInsightDao())
-            val summary = coach.summarizeSession(sessionData)
-            coach.saveInsight(sessionStartedAt, summary)
+            val summary = try {
+                val inferenceEngine = LlamaCppEngine(getApplication())
+                val coach = RealAiCoach(inferenceEngine, db.aiInsightDao())
+                val result2 = coach.summarizeSession(sessionData)
+                coach.saveInsight(sessionStartedAt, result2)
+                result2
+            } catch (_: Exception) {
+                // AI is optional; a missing or failing model must never
+                // block session completion.
+                AiStudySummary(
+                    text = "Consistent practice today. You reviewed ${sessionData.cardsReviewed} " +
+                        "cards with ${sessionData.accuracyPercent}% accuracy."
+                )
+            }
 
             // Session-complete dashboard data (all real, no placeholders).
             val zone = ZoneId.systemDefault()
