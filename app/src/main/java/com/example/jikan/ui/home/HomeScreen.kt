@@ -73,6 +73,7 @@ import java.util.Locale
 fun HomeScreen(
     onStudyNow: () -> Unit,
     onOpenLockedApps: () -> Unit,
+    onOpenEarningApps: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
 ) {
@@ -86,6 +87,7 @@ fun HomeScreen(
         state = state,
         onStudyNow = onStudyNow,
         onOpenLockedApps = onOpenLockedApps,
+        onOpenEarningApps = onOpenEarningApps,
         onDisableLockingForBanking = viewModel::disableLockingForBanking,
         onStartBankingAllowlist = viewModel::startBankingAllowlist,
         onStartFullDisableBankingMode = viewModel::startFullDisableBankingMode,
@@ -111,6 +113,7 @@ private fun HomeScreenContent(
     state: HomeUiState,
     onStudyNow: () -> Unit,
     onOpenLockedApps: () -> Unit,
+    onOpenEarningApps: () -> Unit,
     onDisableLockingForBanking: () -> Unit,
     onStartBankingAllowlist: (String, String, Int) -> Unit,
     onStartFullDisableBankingMode: (Int) -> Unit,
@@ -210,10 +213,12 @@ private fun HomeScreenContent(
         if (summary != null) {
             Spacer(Modifier.height(22.dp))
             TopAppsSection(summary = summary)
+        }
 
-            Spacer(Modifier.height(24.dp))
-            EarningSection(summary = summary)
+        Spacer(Modifier.height(24.dp))
+        EarningSection(summary = summary, onEdit = onOpenEarningApps)
 
+        if (summary != null) {
             Spacer(Modifier.height(24.dp))
             AppLimitsSection(summary = summary)
         }
@@ -471,38 +476,51 @@ private fun TopAppRow(app: ScreenTimeAppUsage, maxMinutes: Int) {
 }
 
 @Composable
-private fun EarningSection(summary: ScreenTimeSummary) {
-    if (summary.earnedMinutes <= 0 && summary.earningApps.isEmpty()) return
+private fun EarningSection(summary: ScreenTimeSummary?, onEdit: () -> Unit) {
+    val hasProgress = summary != null &&
+        (summary.earnedMinutes > 0 || summary.earningApps.isNotEmpty())
     Column {
-        SectionHeader(title = "EARNING", action = null, onAction = null)
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = "+${summary.earnedMinutes}m earned today · ${summary.spentMinutes}m spent",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+        SectionHeader(
+            title = "EARNING",
+            action = if (hasProgress) "Edit  →" else "Set up  →",
+            onAction = onEdit,
         )
-        val earningApps = summary.earningApps.take(3)
-        if (earningApps.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            earningApps.forEachIndexed { index, app ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = app.appLabel,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = "${formatMinutes(app.minutes)} used",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+        Spacer(Modifier.height(12.dp))
+        if (summary != null && hasProgress) {
+            Text(
+                text = "+${summary.earnedMinutes}m earned today · ${summary.spentMinutes}m spent",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            val earningApps = summary.earningApps.take(3)
+            if (earningApps.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                earningApps.forEachIndexed { index, app ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = app.appLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "${formatMinutes(app.minutes)} used",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (index < earningApps.lastIndex) Spacer(Modifier.height(8.dp))
                 }
-                if (index < earningApps.lastIndex) Spacer(Modifier.height(8.dp))
             }
+        } else {
+            Text(
+                text = "Pick apps that earn you minutes.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -1229,6 +1247,7 @@ private fun HomeScreenPreview() {
             ),
             onStudyNow = {},
             onOpenLockedApps = {},
+            onOpenEarningApps = {},
             onDisableLockingForBanking = {},
             onStartBankingAllowlist = { _, _, _ -> },
             onStartFullDisableBankingMode = {},

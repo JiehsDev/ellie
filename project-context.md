@@ -244,6 +244,30 @@ pill/banners → `ScreenTimeHero` ("Today / 3h 21m / ↓ 18m vs yesterday") →
 - Wallet logic, accessibility logic, and AI architecture untouched.
 - Preview updated with representative screen-time data.
 
+## Phase 9: Earning App Configuration
+
+Implemented 2026-10-09. User-facing config for earning rules, reusing the
+existing engine untouched (`EarnRule`, `EarnRuleValidator`,
+`EarningCalculator`, `EarningSessionProcessor`, `EarningAppProgress`,
+`InstalledAppsProvider` all reused as-is; no accounting changes).
+
+- `EarnRuleDao` gained `observeAll()` and `deleteById()` (DAO additions only).
+- New `ui/settings/EarningAppsScreen.kt` + `EarningAppsViewModel.kt`,
+  mirroring the locked-apps screen's visual system (top bar, app rows with
+  icons, switches, AlertDialog editor).
+- Flow: full installed-app list → tap any app → editor dialog (Earn / For /
+  Daily maximum minutes) → save validates via `EarnRuleValidator` with
+  friendly error copy → existing rules editable, toggleable, deletable.
+- Honesty copy in two places: "Jikan measures foreground time — how long the
+  app stays open on your screen. It can't tell whether you finished a lesson,
+  only that the app was active." No hardcoded apps; any launchable app works.
+- Per-rule rows show today's progress: "Today: 10m earned · 2 rewards left"
+  (pure display math in `EarningRuleUi.kt`, mirroring the engine's cap logic).
+- Navigation: new `EARNING_APPS` route in MainActivity; Home's EARNING section
+  is now always visible with a "Set up →"/"Edit →" action.
+- Tests: `EarningAppsUiTest` (7 cases: progress math incl. cap/over-cap/
+  invalid-rule guards, rule description, error mapping).
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.
