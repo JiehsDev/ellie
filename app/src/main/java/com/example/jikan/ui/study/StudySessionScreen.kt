@@ -14,7 +14,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jikan.study.StudyPhase
 import com.example.jikan.study.StudySessionViewModel
 import com.example.jikan.ui.lesson.LessonScreen
-import com.example.jikan.ui.quiz.QuizScreen
 import com.example.jikan.ui.results.ResultsScreen
 
 @Composable
@@ -22,11 +21,12 @@ fun StudySessionScreen(
     modifier: Modifier = Modifier,
     unlockedAppLabel: String? = null,
     sessionKey: Int = 0,
+    sessionSize: Int = StudySessionViewModel.SESSION_SIZE,
     onContinue: () -> Unit = {},
     viewModel: StudySessionViewModel = viewModel(),
 ) {
     LaunchedEffect(sessionKey) {
-        if (sessionKey != 0) viewModel.startSession()
+        if (sessionKey != 0) viewModel.startSession(sessionSize)
     }
     val phase by viewModel.phase.collectAsState()
 
@@ -39,18 +39,15 @@ fun StudySessionScreen(
 
         is StudyPhase.Lesson -> LessonScreen(
             card = current.cards[current.index],
+            cardState = current.cardState,
+            gradePreviews = current.gradePreviews,
             progress = (current.index + 1f) / current.cards.size,
-            onNext = viewModel::onLessonNext,
-            modifier = modifier,
-        )
-
-        is StudyPhase.Quiz -> QuizScreen(
-            question = current.questions[current.index],
-            progress = (current.index + 1f) / current.questions.size,
-            selectedAnswer = current.selectedAnswer,
-            isAnswerCorrect = current.isAnswerCorrect,
-            onAnswerSelected = viewModel::onAnswerSelected,
-            onNext = viewModel::onQuizNext,
+            index = current.index,
+            totalCount = current.cards.size,
+            earnedTodayMinutes = current.earnedTodayMinutes,
+            unlockInMinutes = current.unlockInMinutes,
+            onGrade = viewModel::onGradeSelected,
+            onBack = onContinue,
             modifier = modifier,
         )
 
@@ -62,6 +59,14 @@ fun StudySessionScreen(
             isPerfect = current.isPerfect,
             unlockedAppLabel = unlockedAppLabel,
             aiSummary = current.aiSummary,
+            durationSeconds = current.durationSeconds,
+            earnedTodayMinutes = current.earnedTodayMinutes,
+            avgRecallSeconds = current.avgRecallSeconds,
+            avgIntervalGrowthDays = current.avgIntervalGrowthDays,
+            studyMinutesToday = current.studyMinutesToday,
+            dailyGoalMinutes = current.dailyGoalMinutes,
+            dueCount = current.dueCount,
+            lockedAppLabels = current.lockedAppLabels,
             onContinue = onContinue,
             onKeepStudying = viewModel::onKeepStudying,
             modifier = modifier,
