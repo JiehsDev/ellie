@@ -31,7 +31,15 @@ import java.time.ZoneId
  */
 class StudySessionViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
-    private val repository = StudyRepository(db.cardDao(), db.progressDao(), db.sessionDao(), db.walletDao(), db.settingsDao())
+    private val repository = StudyRepository(
+        db.cardDao(),
+        db.progressDao(),
+        db.sessionDao(),
+        db.walletDao(),
+        db.settingsDao(),
+        db.walletTransactionDao(),
+        db.creditDayStateDao(),
+    )
 
     private val _phase = MutableStateFlow<StudyPhase>(StudyPhase.Loading)
     val phase: StateFlow<StudyPhase> = _phase.asStateFlow()

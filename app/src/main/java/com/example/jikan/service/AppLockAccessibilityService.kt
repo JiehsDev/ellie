@@ -15,6 +15,7 @@ import com.example.jikan.data.AppRestriction
 import com.example.jikan.data.AppRestrictionDao
 import com.example.jikan.data.AppUsage
 import com.example.jikan.data.AppUsageDao
+import com.example.jikan.study.CreditPolicy
 import com.example.jikan.data.LockTier
 import com.example.jikan.data.Wallet
 import com.example.jikan.data.WalletDao
@@ -69,6 +70,13 @@ class AppLockAccessibilityService : AccessibilityService() {
     // Phase 4: generic app restrictions, independent of lock tiers.
     @Volatile private var restrictionsMap: Map<String, AppRestriction> = emptyMap()
     @Volatile private var strictModeEnabled: Boolean = false
+    // Credit policy: daily allowance shared across restricted apps, and
+    // per-unlock-session cap. Loaded from CreditDayState + UserSettings.
+    @Volatile private var creditProfile: CreditPolicy.CreditProfile = CreditPolicy.CreditProfile.BALANCED
+    @Volatile private var allowanceUsedToday: Int = 0
+    @Volatile private var unlockWindowStartMs: Long = 0L
+    @Volatile private var unlockWindowMinutesUsed: Int = 0
+    @Volatile private var lastRestrictedForegroundMs: Long = 0L
 
     private val lastReminderTimeMap = mutableMapOf<String, Long>()
     private val lastForceCloseTimeMap = mutableMapOf<String, Long>()
@@ -78,6 +86,7 @@ class AppLockAccessibilityService : AccessibilityService() {
     private lateinit var earningSessionTracker: EarningSessionTracker
     private lateinit var appRestrictionDao: AppRestrictionDao
     private lateinit var usageStatsDataSource: UsageStatsDataSource
+    private lateinit var serviceDb: AppDatabase
     private var disableReceiverRegistered = false
     // Today's per-package foreground minutes, refreshed at most once per
     // RESTRICTION_USAGE_CACHE_TTL_MS. Concurrent: written on IO, read on main.
@@ -105,17 +114,42 @@ class AppLockAccessibilityService : AccessibilityService() {
     private val spendRunnable = object : Runnable {
         override fun run() {
             val foreground = currentForegroundPackage
+            val nowMs = System.currentTimeMillis()
+            val isRestricted = foreground != null &&
+                (foreground in lockedPackagesMap.keys || walletExtendsRestriction(foreground))
             // Locked apps spend while the wallet can pay (existing behavior).
             // Phase 4: a restricted app at/over its daily limit also spends to
             // extend access generically — unless strict mode makes it a hard block.
-            if (!isPaused && foreground != null && walletBalance > 0 &&
-                (foreground in lockedPackagesMap.keys || walletExtendsRestriction(foreground))
-            ) {
-                serviceScope.launch {
-                    walletDao.spend(SPEND_MINUTES_PER_TICK)
-                    recordUsage(foreground, SPEND_MINUTES_PER_TICK)
-                    WidgetUpdater.refresh(applicationContext)
+            // Credit policy: spending also requires remaining daily allowance
+            // (shared across apps) and must not exceed the per-session cap.
+            if (!isPaused && isRestricted && walletBalance > 0) {
+                val config = CreditPolicy.configFor(creditProfile)
+                val allowanceRemaining = config.dailyAllowanceMinutes - allowanceUsedToday
+
+                // Unlock window: resets after 5 min without restricted-app use.
+                // Switching apps does NOT reset the timer.
+                if (nowMs - lastRestrictedForegroundMs > UNLOCK_WINDOW_RESET_MS) {
+                    unlockWindowStartMs = nowMs
+                    unlockWindowMinutesUsed = 0
                 }
+                lastRestrictedForegroundMs = nowMs
+
+                val sessionRemaining = config.maxUnlockMinutes - unlockWindowMinutesUsed
+                if (allowanceRemaining > 0 && sessionRemaining > 0) {
+                    serviceScope.launch {
+                        walletDao.spend(SPEND_MINUTES_PER_TICK)
+                        recordUsage(foreground!!, SPEND_MINUTES_PER_TICK)
+                        // Persist shared allowance usage.
+                        val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault()).toEpochDay()
+                        serviceDb.creditDayStateDao().addAllowanceUsed(today, SPEND_MINUTES_PER_TICK, nowMs)
+                        allowanceUsedToday += SPEND_MINUTES_PER_TICK
+                        unlockWindowMinutesUsed += SPEND_MINUTES_PER_TICK
+                        WidgetUpdater.refresh(applicationContext)
+                    }
+                }
+                // If allowance or session cap is exhausted, the app is NOT
+                // force-closed here; the existing lock/redirect logic handles
+                // the next foreground check via the normal gate.
             }
             handler.postDelayed(this, SPEND_TICK_INTERVAL_MS)
         }
@@ -137,12 +171,36 @@ class AppLockAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         val db = AppDatabase.getInstance(applicationContext)
+        serviceDb = db
         walletDao = db.walletDao()
         appUsageDao = db.appUsageDao()
         earningSessionTracker = EarningSessionTracker(db)
         appRestrictionDao = db.appRestrictionDao()
         usageStatsDataSource = AndroidUsageStatsDataSource(applicationContext)
         registerDisableReceiver()
+
+        // Load credit policy profile and today's allowance usage.
+        serviceScope.launch {
+            val settings = db.settingsDao().get()
+            creditProfile = try {
+                CreditPolicy.CreditProfile.valueOf(settings?.creditProfileName ?: "BALANCED")
+            } catch (_: Exception) {
+                CreditPolicy.CreditProfile.BALANCED
+            }
+            val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault()).toEpochDay()
+            var state = db.creditDayStateDao().get(today)
+            if (state == null) {
+                db.creditDayStateDao().insert(
+                    com.example.jikan.data.CreditDayState(
+                        epochDay = today,
+                        profileName = creditProfile.name,
+                        lastClockMs = System.currentTimeMillis(),
+                    )
+                )
+                state = db.creditDayStateDao().get(today)
+            }
+            allowanceUsedToday = state?.allowanceUsedMinutes ?: 0
+        }
 
         db.lockedAppDao().observeLocked()
             .onEach { apps -> lockedPackagesMap = apps.associate { it.packageName to it.tier } }
@@ -417,6 +475,8 @@ class AppLockAccessibilityService : AccessibilityService() {
         private const val SPEND_MINUTES_PER_TICK = 1
         private const val REGEN_TICK_INTERVAL_MS = 10 * 60_000L
         private const val REGEN_MINUTES_PER_TICK = 1
+        // Credit policy: unlock window resets after 5 min without restricted-app use.
+        private const val UNLOCK_WINDOW_RESET_MS = 5 * 60_000L
         // Phase 4: bounds on restriction evaluation + usage-stat caching.
         private const val RESTRICTION_USAGE_CACHE_TTL_MS = 60_000L
         private const val RESTRICTION_EVAL_DEBOUNCE_MS = 60_000L
