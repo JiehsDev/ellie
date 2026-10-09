@@ -4,6 +4,7 @@ import com.example.jikan.srs.RecallGrade
 import com.example.jikan.srs.SrsEngine
 import com.example.jikan.srs.SrsState
 import com.example.jikan.study.CreditCalculator
+import com.example.jikan.study.CreditPolicy
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -21,6 +22,8 @@ class StudyRepository(
     private val sessionDao: SessionDao,
     private val walletDao: WalletDao,
     private val settingsDao: SettingsDao? = null,
+    private val walletTransactionDao: WalletTransactionDao? = null,
+    private val creditDayStateDao: CreditDayStateDao? = null,
 ) {
     suspend fun buildSessionQueue(sessionSize: Int): List<Card> {
         val now = System.currentTimeMillis()
@@ -89,6 +92,20 @@ class StudyRepository(
         val zone = ZoneId.systemDefault()
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toEpochDay()
 
+        // Idempotency: a session is uniquely identified by its start time.
+        // Processing the same session twice must not award credits twice.
+        val idempotencyKey = "session:$sessionStartedAt"
+        val existing = walletTransactionDao?.getByIdempotencyKey(idempotencyKey)
+        if (existing != null) {
+            val wallet = walletDao.get() ?: Wallet()
+            return SessionCompletionResult(
+                creditsEarned = existing.minutes,
+                walletBalance = wallet.creditBalanceMinutes,
+                streakDays = wallet.currentStreakDays,
+                isPerfect = correctCount == totalCount,
+            )
+        }
+
         val wallet = walletDao.get() ?: Wallet()
         val settings = settingsDao?.get()
         val strictViolationRecently = settings?.let {
@@ -104,15 +121,32 @@ class StudyRepository(
             else -> 1
         }
 
-        val startOfToday = LocalDate.ofEpochDay(today).atStartOfDay(zone).toInstant().toEpochMilli()
-        val priorSessionsToday = sessionDao.getSince(startOfToday).size
+        // New credit policy: earning is based on validated study MINUTES
+        // (session duration), tiered per day. This replaces the per-answer
+        // formula with its per-session decay.
+        val profile = try {
+            CreditPolicy.CreditProfile.valueOf(settings?.creditProfileName ?: "BALANCED")
+        } catch (_: Exception) {
+            CreditPolicy.CreditProfile.BALANCED
+        }
+        val config = CreditPolicy.configFor(profile)
+        val validatedMinutes = ((now - sessionStartedAt) / 60_000L).toInt().coerceAtLeast(1)
 
-        val creditsEarned = CreditCalculator.creditsEarned(
-            correctCount = correctCount,
-            totalCount = totalCount,
-            currentStreakDays = newStreak,
-            priorSessionsToday = priorSessionsToday,
-        )
+        // Get or create today's credit state (atomic for concurrent sessions).
+        val dayStateDao = creditDayStateDao
+        var priorMinutes = 0
+        if (dayStateDao != null) {
+            var dayState = dayStateDao.get(today)
+            if (dayState == null) {
+                dayStateDao.insert(
+                    CreditDayState(epochDay = today, profileName = profile.name, lastClockMs = now)
+                )
+                dayState = dayStateDao.get(today)!!
+            }
+            priorMinutes = dayState.validatedStudyMinutes
+        }
+        val creditsEarned = CreditPolicy.creditsForNewMinutes(config, priorMinutes, validatedMinutes)
+        dayStateDao?.addValidatedMinutes(today, validatedMinutes, now)
 
         val updatedWallet = wallet.copy(
             creditBalanceMinutes = (wallet.creditBalanceMinutes + creditsEarned).coerceAtMost(Wallet.MAX_BALANCE_MINUTES),
@@ -121,6 +155,22 @@ class StudyRepository(
             lifetimeCreditsEarned = wallet.lifetimeCreditsEarned + creditsEarned,
         )
         walletDao.upsert(updatedWallet)
+
+        // Auditable ledger entry with idempotency key.
+        walletTransactionDao?.insert(
+            WalletTransaction(
+                type = WalletTransactionType.EARN,
+                minutes = creditsEarned,
+                balanceAfter = updatedWallet.creditBalanceMinutes,
+                createdAtMs = now,
+                epochDay = today,
+                idempotencyKey = idempotencyKey,
+                note = "Study session: $validatedMinutes validated minutes " +
+                    "(${priorMinutes}m → ${priorMinutes + validatedMinutes}m today, ${config.displayName})",
+                source = WalletTransactionSource.UNKNOWN,
+                qualifyingMinutes = validatedMinutes,
+            )
+        )
 
         sessionDao.insert(
             Session(

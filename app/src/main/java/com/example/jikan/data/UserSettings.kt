@@ -28,6 +28,7 @@ data class UserSettings(
     val bankingDisabledUntilMs: Long = 0L,
     val bankingModeActive: Boolean = false,
     val lastViolationAtMs: Long = 0L,
+    val creditProfileName: String = "BALANCED",
 ) {
     companion object {
         const val SINGLETON_ID = 1

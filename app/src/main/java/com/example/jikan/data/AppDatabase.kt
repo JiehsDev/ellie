@@ -211,6 +211,23 @@ private val MIGRATION_13_14 = object : Migration(13, 14) {
     }
 }
 
+private val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `credit_day_state` (" +
+                "`epochDay` INTEGER NOT NULL, " +
+                "`validatedStudyMinutes` INTEGER NOT NULL DEFAULT 0, " +
+                "`allowanceUsedMinutes` INTEGER NOT NULL DEFAULT 0, " +
+                "`profileName` TEXT NOT NULL DEFAULT 'BALANCED', " +
+                "`lastClockMs` INTEGER NOT NULL DEFAULT 0, " +
+                "PRIMARY KEY(`epochDay`))"
+        )
+        db.execSQL(
+            "ALTER TABLE `user_settings` ADD COLUMN `creditProfileName` TEXT NOT NULL DEFAULT 'BALANCED'"
+        )
+    }
+}
+
 @Database(
     entities = [
         Card::class,
@@ -229,8 +246,9 @@ private val MIGRATION_13_14 = object : Migration(13, 14) {
         WalletTransaction::class,
         EarningAppProgress::class,
         AppRestriction::class,
+        CreditDayState::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -251,6 +269,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun walletTransactionDao(): WalletTransactionDao
     abstract fun earningAppProgressDao(): EarningAppProgressDao
     abstract fun appRestrictionDao(): AppRestrictionDao
+    abstract fun creditDayStateDao(): CreditDayStateDao
 
     companion object {
         @Volatile
@@ -276,6 +295,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_11_12,
                         MIGRATION_12_13,
                         MIGRATION_13_14,
+                        MIGRATION_14_15,
                     )
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()

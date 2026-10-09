@@ -9,6 +9,8 @@ enum class WalletTransactionType {
     SPEND,
     MANUAL_ADJUSTMENT,
     EXPIRATION,
+    RESERVATION,
+    REFUND,
 }
 
 enum class WalletTransactionSource {
