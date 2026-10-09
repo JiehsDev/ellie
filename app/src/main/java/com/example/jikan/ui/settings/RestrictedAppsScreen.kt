@@ -98,7 +98,7 @@ private fun RestrictedAppsScreenContent(
             Text(text = "App limits", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Set a daily limit for any app. When the limit is reached, Jikan's " +
+                text = "Set a daily limit for any app. When the limit is reached, Ellie's " +
                     "protection steps in automatically — the same deterministic rules " +
                     "every time, never an AI decision.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -268,7 +268,7 @@ private fun RestrictionEditorDialog(
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "When the limit is reached, Jikan steps in automatically. " +
+                    text = "When the limit is reached, Ellie steps in automatically. " +
                         "0 blocks the app as soon as it opens.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

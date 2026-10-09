@@ -244,7 +244,7 @@ private fun BankingModeDialog(
                 }
             },
             title = { Text("Protection is off") },
-            text = { Text("When you're done, open Accessibility settings, find Jikan in the list, and turn it on.") },
+            text = { Text("When you're done, open Accessibility settings, find Ellie in the list, and turn it on.") },
         )
     }
 }
