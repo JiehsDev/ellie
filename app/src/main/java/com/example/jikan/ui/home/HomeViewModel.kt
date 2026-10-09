@@ -30,7 +30,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** One bar in Home's week strip: how many minutes were studied on that day. */
+/** One bar in Home's week strip: minutes recorded for that day. */
 data class StudyDay(
     val initial: String,
     val minutes: Int,

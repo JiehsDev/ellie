@@ -222,6 +222,28 @@ stop sequence. `AiCoach`, `RealAiCoach`, `FakeAiCoach`, `InferenceEngine`,
   coach path; the AI path is ready but not yet wired into UI (per "do not
   redesign UI yet").
 
+## Phase 8: Jikan Home Dashboard
+
+Implemented 2026-10-09. Home reoriented as a screen-time control center while
+preserving the existing design language (NeoCard, SectionHeader, pills, warm
+palette) and all existing behavior components.
+
+New hierarchy in `HomeScreenContent`: greeting → coach bubble → protection
+pill/banners → `ScreenTimeHero` ("Today / 3h 21m / ↓ 18m vs yesterday") →
+`WalletPanel` → primary "Study now" action → `TopAppsSection` (label + minutes
++ slim bars) → `EarningSection` ("+15m earned · 20m spent" + per-app usage) →
+`AppLimitsSection` (exceeded → at-limit → approaching rows with status dots)
+→ locked apps → quick actions → `ScreenTimeWeekStrip` → theme selector.
+
+- Screen-time sections render only when `state.screenTimeSummary` is non-null
+  (usage access granted); no ViewModel changes were needed.
+- Mascot kept as the existing static image, interacting with the coach bubble
+  through composition (no Lottie/GIF/video/new assets).
+- The study-centric `StatLedger` (streak/spent/learned) was removed from Home;
+  `WeekStrip` now shows screen-time minutes via a title parameter.
+- Wallet logic, accessibility logic, and AI architecture untouched.
+- Preview updated with representative screen-time data.
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.

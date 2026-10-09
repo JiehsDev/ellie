@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -57,6 +56,13 @@ import com.example.jikan.ui.theme.RadiusMd
 import com.example.jikan.ui.theme.RadiusSm
 import com.example.jikan.ui.theme.neoRaised
 import com.example.jikan.data.ThemeMode
+import com.example.jikan.screentime.AppUsageStatus
+import com.example.jikan.screentime.ApproachingAppUsage
+import com.example.jikan.screentime.DayUsage
+import com.example.jikan.screentime.ScreenTimeAppUsage
+import com.example.jikan.screentime.ScreenTimeSummary
+import com.example.jikan.screentime.UsageChange
+import com.example.jikan.screentime.UsageChangeDirection
 import com.example.jikan.service.PauseManager
 import java.time.LocalDate
 import java.time.LocalTime
@@ -178,6 +184,15 @@ private fun HomeScreenContent(
             StrictStatusBanner(state = state)
         }
 
+        // Phase 8 dashboard: screen-time control center. Screen-time sections
+        // render only when the summary is available (usage access granted).
+        val summary = state.screenTimeSummary
+
+        if (summary != null) {
+            Spacer(Modifier.height(18.dp))
+            ScreenTimeHero(summary = summary)
+        }
+
         Spacer(Modifier.height(18.dp))
         WalletPanel(
             minutes = state.walletBalanceMinutes,
@@ -192,18 +207,16 @@ private fun HomeScreenContent(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(22.dp))
-        QuickActions(
-            dueCount = state.dueCount,
-            walletBalanceMinutes = state.walletBalanceMinutes,
-            lockedAppCount = state.lockedAppCount,
-            onStudyNow = onStudyNow,
-            onOpenLockedApps = onOpenLockedApps,
-            onBankingMode = onDisableLockingForBanking,
-        )
+        if (summary != null) {
+            Spacer(Modifier.height(22.dp))
+            TopAppsSection(summary = summary)
 
-        Spacer(Modifier.height(24.dp))
-        StatLedger(state = state)
+            Spacer(Modifier.height(24.dp))
+            EarningSection(summary = summary)
+
+            Spacer(Modifier.height(24.dp))
+            AppLimitsSection(summary = summary)
+        }
 
         Spacer(Modifier.height(24.dp))
         LockedAppsSection(
@@ -213,7 +226,19 @@ private fun HomeScreenContent(
         )
 
         Spacer(Modifier.height(24.dp))
-        WeekStrip(week = state.week)
+        QuickActions(
+            dueCount = state.dueCount,
+            walletBalanceMinutes = state.walletBalanceMinutes,
+            lockedAppCount = state.lockedAppCount,
+            onStudyNow = onStudyNow,
+            onOpenLockedApps = onOpenLockedApps,
+            onBankingMode = onDisableLockingForBanking,
+        )
+
+        if (summary != null && summary.weeklyTrend.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            ScreenTimeWeekStrip(summary = summary)
+        }
 
         Spacer(Modifier.height(24.dp))
         ThemeModeSelector(
@@ -342,6 +367,253 @@ private fun WalletPanel(
             )
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 8: screen-time dashboard sections. Plain rows, not nested cards — the
+// wallet panel and coach bubble carry the visual weight on this screen.
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ScreenTimeHero(summary: ScreenTimeSummary) {
+    Column {
+        SectionHeader(title = "SCREEN TIME", action = null, onAction = null)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Today",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = formatMinutes(summary.totalScreenTimeMinutes),
+            style = MaterialTheme.typography.displayLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(4.dp))
+        val change = summary.recentUsageChange
+        val improved = change.direction == UsageChangeDirection.DOWN && change.deltaMinutes != 0
+        val deltaText = when {
+            summary.previousDayScreenTimeMinutes <= 0 -> "First day of tracking."
+            change.deltaMinutes == 0 -> "Same as yesterday."
+            improved -> "↓ ${formatMinutes(-change.deltaMinutes)} vs yesterday"
+            else -> "↑ ${formatMinutes(change.deltaMinutes)} vs yesterday"
+        }
+        Text(
+            text = deltaText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (improved) {
+                MaterialTheme.colorScheme.secondary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+}
+
+private fun formatMinutes(minutes: Int): String {
+    if (minutes < 60) return "${minutes}m"
+    val hours = minutes / 60
+    val rest = minutes % 60
+    return if (rest == 0) "${hours}h" else "${hours}h ${rest}m"
+}
+
+@Composable
+private fun TopAppsSection(summary: ScreenTimeSummary) {
+    val topApps = summary.topApps.take(5)
+    if (topApps.isEmpty()) return
+    Column {
+        SectionHeader(title = "TOP APPS", action = null, onAction = null)
+        Spacer(Modifier.height(12.dp))
+        val max = topApps.maxOf { it.minutes }.coerceAtLeast(1)
+        topApps.forEachIndexed { index, app ->
+            TopAppRow(app = app, maxMinutes = max)
+            if (index < topApps.lastIndex) Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun TopAppRow(app: ScreenTimeAppUsage, maxMinutes: Int) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = app.appLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = formatMinutes(app.minutes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth((app.minutes / maxMinutes.toFloat()).coerceIn(0f, 1f))
+                    .height(6.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EarningSection(summary: ScreenTimeSummary) {
+    if (summary.earnedMinutes <= 0 && summary.earningApps.isEmpty()) return
+    Column {
+        SectionHeader(title = "EARNING", action = null, onAction = null)
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "+${summary.earnedMinutes}m earned today · ${summary.spentMinutes}m spent",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        val earningApps = summary.earningApps.take(3)
+        if (earningApps.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            earningApps.forEachIndexed { index, app ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = app.appLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${formatMinutes(app.minutes)} used",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (index < earningApps.lastIndex) Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+private enum class LimitRowState { EXCEEDED, AT_LIMIT, APPROACHING }
+
+private data class LimitRow(
+    val appLabel: String,
+    val minutes: Int,
+    val limitMinutes: Int,
+    val state: LimitRowState,
+    val detail: String,
+)
+
+@Composable
+private fun AppLimitsSection(summary: ScreenTimeSummary) {
+    val rows = buildList {
+        summary.exceededApps.forEach {
+            add(
+                LimitRow(
+                    appLabel = it.appLabel,
+                    minutes = it.minutes,
+                    limitMinutes = it.limitMinutes,
+                    state = LimitRowState.EXCEEDED,
+                    detail = "${formatMinutes(it.overLimitMinutes)} over",
+                )
+            )
+        }
+        summary.atLimitApps.forEach {
+            add(
+                LimitRow(
+                    appLabel = it.appLabel,
+                    minutes = it.minutes,
+                    limitMinutes = it.limitMinutes,
+                    state = LimitRowState.AT_LIMIT,
+                    detail = "at limit",
+                )
+            )
+        }
+        summary.approachingApps.forEach {
+            add(
+                LimitRow(
+                    appLabel = it.appLabel,
+                    minutes = it.minutes,
+                    limitMinutes = it.limitMinutes,
+                    state = LimitRowState.APPROACHING,
+                    detail = "${formatMinutes(it.remainingMinutes)} left",
+                )
+            )
+        }
+    }
+    Column {
+        SectionHeader(title = "APP LIMITS", action = null, onAction = null)
+        Spacer(Modifier.height(12.dp))
+        if (rows.isEmpty()) {
+            Text(
+                text = "No limits set yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            rows.forEachIndexed { index, row ->
+                val statusColor = when (row.state) {
+                    LimitRowState.EXCEEDED -> MaterialTheme.colorScheme.error
+                    LimitRowState.AT_LIMIT -> MaterialTheme.colorScheme.tertiary
+                    LimitRowState.APPROACHING -> MaterialTheme.colorScheme.secondary
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(statusColor, CircleShape),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = row.appLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${formatMinutes(row.minutes)}/${formatMinutes(row.limitMinutes)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = row.detail,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = statusColor,
+                    )
+                }
+                if (index < rows.lastIndex) Spacer(Modifier.height(10.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScreenTimeWeekStrip(summary: ScreenTimeSummary) {
+    val week = summary.weeklyTrend.map { day ->
+        StudyDay(
+            initial = LocalDate.ofEpochDay(day.epochDay).dayOfWeek.name.take(1),
+            minutes = day.minutes,
+            isToday = day.epochDay == summary.epochDay,
+        )
+    }
+    WeekStrip(week = week, title = "SCREEN TIME THIS WEEK")
 }
 
 @Composable
@@ -752,81 +1024,6 @@ private fun TimeDial(
 }
 
 @Composable
-private fun StatLedger(state: HomeUiState) {
-    Column {
-        Hairline()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 18.dp),
-        ) {
-            LedgerStat(
-                value = "${state.streakDays}",
-                unit = if (state.streakDays == 1) "day" else "days",
-                label = "STREAK",
-                // Sage, not vermillion: vermillion means "running out" on the dial, and a
-                // growing streak is the opposite of a warning.
-                valueColor = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.weight(1f),
-            )
-            LedgerStat(
-                value = "${state.minutesSpentToday}",
-                unit = "min",
-                label = "SPENT TODAY",
-                valueColor = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
-            )
-            LedgerStat(
-                value = "${state.cardsLearned}",
-                unit = "/ ${state.totalCards}",
-                label = "LEARNED",
-                valueColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Hairline()
-    }
-}
-
-@Composable
-private fun LedgerStat(
-    value: String,
-    unit: String,
-    label: String,
-    valueColor: Color,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(text = value, style = MaterialTheme.typography.titleLarge, color = valueColor)
-            Spacer(Modifier.width(3.dp))
-            Text(
-                text = unit,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 3.dp),
-            )
-        }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun Hairline() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(MaterialTheme.colorScheme.outline),
-    )
-}
-
-@Composable
 private fun LockedAppsSection(apps: List<LockedAppChip>, lockedCount: Int, onEdit: () -> Unit) {
     Column {
         SectionHeader(
@@ -890,10 +1087,10 @@ private fun AppIcon(app: LockedAppChip) {
 }
 
 @Composable
-private fun WeekStrip(week: List<StudyDay>) {
+private fun WeekStrip(week: List<StudyDay>, title: String) {
     val peak = (week.maxOfOrNull { it.minutes } ?: 0).coerceAtLeast(1)
     Column {
-        SectionHeader(title = "STUDIED THIS WEEK", action = null, onAction = null)
+        SectionHeader(title = title, action = null, onAction = null)
         Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -997,6 +1194,38 @@ private fun HomeScreenPreview() {
                 ),
                 protectionOn = false,
                 themeMode = ThemeMode.SYSTEM,
+                screenTimeSummary = ScreenTimeSummary(
+                    epochDay = 10L,
+                    totalScreenTimeMinutes = 201,
+                    previousDayScreenTimeMinutes = 224,
+                    averageDailyScreenTimeMinutes = 210,
+                    restrictedAppMinutes = 134,
+                    earningAppMinutes = 31,
+                    earnedMinutes = 15,
+                    spentMinutes = 20,
+                    walletBalanceMinutes = 10,
+                    topApps = listOf(
+                        ScreenTimeAppUsage("com.youtube", "YouTube", 71, 35.3f, AppUsageStatus.GENERAL),
+                        ScreenTimeAppUsage("com.tiktok", "TikTok", 42, 20.9f, AppUsageStatus.GENERAL),
+                        ScreenTimeAppUsage("com.chrome", "Chrome", 31, 15.4f, AppUsageStatus.GENERAL),
+                    ),
+                    approachingApps = listOf(
+                        ApproachingAppUsage("com.tiktok", "TikTok", 24, 30, 6, 80f),
+                    ),
+                    earningApps = listOf(
+                        ScreenTimeAppUsage("com.duolingo", "Duolingo", 6, 3f, AppUsageStatus.EARNING),
+                    ),
+                    weeklyTrend = listOf(
+                        DayUsage(4L, 180),
+                        DayUsage(5L, 240),
+                        DayUsage(6L, 150),
+                        DayUsage(7L, 300),
+                        DayUsage(8L, 190),
+                        DayUsage(9L, 224),
+                        DayUsage(10L, 201),
+                    ),
+                    recentUsageChange = UsageChange(-23, -10.3f, UsageChangeDirection.DOWN),
+                ),
             ),
             onStudyNow = {},
             onOpenLockedApps = {},
