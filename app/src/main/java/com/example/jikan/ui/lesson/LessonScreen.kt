@@ -107,7 +107,7 @@ fun LessonScreen(
             )
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
