@@ -115,7 +115,7 @@ fun AllowanceScreen(
             Spacer(Modifier.width(12.dp))
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
@@ -369,7 +369,7 @@ private fun CoachTipCard(message: String) {
     ) {
         Image(
             painter = painterResource(R.drawable.mascot_jikan_coach),
-            contentDescription = "JikanCoach",
+            contentDescription = "Ellie",
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
@@ -378,7 +378,7 @@ private fun CoachTipCard(message: String) {
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Jikan Coach • Pacing Tip",
+                text = "Ellie • Pacing Tip",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
