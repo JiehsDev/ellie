@@ -101,7 +101,7 @@ fun DeepDiveScreen(
             Spacer(Modifier.width(12.dp))
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
@@ -386,7 +386,7 @@ fun DeepDiveScreen(
         ) {
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
@@ -395,7 +395,7 @@ fun DeepDiveScreen(
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Jikan Reflection • Steady Path",
+                    text = "Ellie Reflection • Steady Path",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 0.5.sp,
