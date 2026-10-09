@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.jikan.ui.coach.JikanCoachMessage
+import com.example.jikan.ui.home.HomeCoachMessageProvider
 import com.example.jikan.ui.theme.JikanTheme
 import com.example.jikan.ui.theme.NeoCard
 import com.example.jikan.ui.theme.OutlinePillButton
@@ -34,6 +35,7 @@ fun ResultsScreen(
     walletBalance: Int,
     isPerfect: Boolean,
     unlockedAppLabel: String?,
+    aiSummary: String? = null,
     onContinue: () -> Unit,
     onKeepStudying: () -> Unit,
     modifier: Modifier = Modifier,
@@ -102,6 +104,18 @@ fun ResultsScreen(
             }
         }
 
+        val coachMessage = aiSummary ?: HomeCoachMessageProvider.resultsMessage(
+            correctCount = correctCount,
+            totalCount = totalCount,
+            creditsEarned = creditsEarned,
+            walletBalanceMinutes = walletBalance,
+            isPerfect = isPerfect,
+        )
+        if (coachMessage.isNotBlank()) {
+            Spacer(Modifier.height(14.dp))
+            JikanCoachMessage(message = coachMessage)
+        }
+
         if (!isPerfect) {
             Spacer(Modifier.height(14.dp))
             NeoCard(modifier = Modifier.fillMaxWidth(), elevation = 6.dp) {
@@ -135,6 +149,7 @@ private fun ResultsScreenPreview() {
             walletBalance = 60,
             isPerfect = false,
             unlockedAppLabel = "Loopy",
+            aiSummary = "Consistent practice today. You reviewed 10 cards with 90% accuracy and earned 18 minutes.",
             onContinue = {},
             onKeepStudying = {},
         )

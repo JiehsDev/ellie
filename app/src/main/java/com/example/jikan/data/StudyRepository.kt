@@ -19,6 +19,7 @@ class StudyRepository(
     private val progressDao: ProgressDao,
     private val sessionDao: SessionDao,
     private val walletDao: WalletDao,
+    private val settingsDao: SettingsDao? = null,
 ) {
     suspend fun buildSessionQueue(sessionSize: Int): List<Card> {
         val now = System.currentTimeMillis()
@@ -58,9 +59,17 @@ class StudyRepository(
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toEpochDay()
 
         val wallet = walletDao.get() ?: Wallet()
-        val newStreak = when (wallet.lastStudyEpochDay) {
-            today -> wallet.currentStreakDays.coerceAtLeast(1)
-            today - 1 -> wallet.currentStreakDays + 1
+        val settings = settingsDao?.get()
+        val strictViolationRecently = settings?.let {
+            it.strictModeEnabled && it.lastViolationAtMs > 0L && now - it.lastViolationAtMs <= STRICT_VIOLATION_FREEZE_REVOKE_MS
+        } ?: false
+        val newStreak = when {
+            wallet.lastStudyEpochDay == today -> wallet.currentStreakDays.coerceAtLeast(1)
+            wallet.lastStudyEpochDay == today - 1 -> wallet.currentStreakDays + 1
+            wallet.lastStudyEpochDay == today - 2 && wallet.currentStreakDays >= 3 && !strictViolationRecently -> {
+                // Streak freeze / grace period: missed 1 day, streak protected!
+                wallet.currentStreakDays + 1
+            }
             else -> 1
         }
 
@@ -99,5 +108,9 @@ class StudyRepository(
             streakDays = newStreak,
             isPerfect = correctCount == totalCount,
         )
+    }
+
+    private companion object {
+        private const val STRICT_VIOLATION_FREEZE_REVOKE_MS = 7 * 24 * 60 * 60 * 1000L
     }
 }

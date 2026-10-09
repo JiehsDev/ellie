@@ -3,6 +3,9 @@ package com.example.jikan.study
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.jikan.coach.LlamaCppEngine
+import com.example.jikan.coach.RealAiCoach
+import com.example.jikan.coach.StudySessionData
 import com.example.jikan.data.AppDatabase
 import com.example.jikan.data.Card
 import com.example.jikan.data.CardSeeder
@@ -15,7 +18,7 @@ import kotlinx.coroutines.launch
 
 class StudySessionViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
-    private val repository = StudyRepository(db.cardDao(), db.progressDao(), db.sessionDao(), db.walletDao())
+    private val repository = StudyRepository(db.cardDao(), db.progressDao(), db.sessionDao(), db.walletDao(), db.settingsDao())
 
     private val _phase = MutableStateFlow<StudyPhase>(StudyPhase.Loading)
     val phase: StateFlow<StudyPhase> = _phase.asStateFlow()
@@ -104,12 +107,33 @@ class StudySessionViewModel(application: Application) : AndroidViewModel(applica
                 sessionStartedAt = sessionStartedAt,
             )
             WidgetUpdater.refresh(getApplication())
+
+            val durationMin = ((System.currentTimeMillis() - sessionStartedAt) / 60_000L).toInt().coerceAtLeast(1)
+            val accuracy = if (total > 0) (quiz.correctCount * 100) / total else 0
+            val sessionData = StudySessionData(
+                cardsReviewed = total,
+                correctAnswers = quiz.correctCount,
+                incorrectAnswers = total - quiz.correctCount,
+                accuracyPercent = accuracy,
+                durationMinutes = durationMin,
+                creditsEarned = result.creditsEarned,
+                weakCards = emptyList(),
+                currentStreak = result.streakDays,
+                previousAccuracyPercent = null,
+            )
+
+            val inferenceEngine = LlamaCppEngine(getApplication())
+            val coach = RealAiCoach(inferenceEngine, db.aiInsightDao())
+            val summary = coach.summarizeSession(sessionData)
+            coach.saveInsight(sessionStartedAt, summary)
+
             _phase.value = StudyPhase.Results(
                 correctCount = quiz.correctCount,
                 totalCount = total,
                 creditsEarned = result.creditsEarned,
                 walletBalance = result.walletBalance,
                 isPerfect = result.isPerfect,
+                aiSummary = summary.text,
             )
         }
     }

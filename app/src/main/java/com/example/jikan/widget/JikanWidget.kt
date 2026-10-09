@@ -42,19 +42,33 @@ private val WidgetVermillion = Color(0xFFB5543C)
 
 class JikanWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val wallet = AppDatabase.getInstance(context).walletDao().get() ?: Wallet()
+        val db = AppDatabase.getInstance(context)
+        val wallet = db.walletDao().get() ?: Wallet()
+        val settings = db.settingsDao().get()
+        val banking = db.bankingAllowlistDao().active(System.currentTimeMillis()).firstOrNull()
 
         provideContent {
             WidgetContent(
                 walletMinutes = wallet.creditBalanceMinutes,
                 streakDays = wallet.currentStreakDays,
+                status = widgetStatus(settings?.strictModeEnabled == true, settings?.strictGraceUntilMs ?: 0L, banking?.appLabel),
             )
+        }
+    }
+
+    private fun widgetStatus(strict: Boolean, graceUntilMs: Long, bankingLabel: String?): String {
+        val now = System.currentTimeMillis()
+        return when {
+            bankingLabel != null -> "Banking: $bankingLabel"
+            strict && graceUntilMs > now -> "Strict: grace ${((graceUntilMs - now) / 60_000L).coerceAtLeast(1)}m"
+            strict -> "Strict: healthy"
+            else -> "Protection ready"
         }
     }
 }
 
 @Composable
-private fun WidgetContent(walletMinutes: Int, streakDays: Int) {
+private fun WidgetContent(walletMinutes: Int, streakDays: Int, status: String) {
     val context = LocalContext.current
     Box(
         modifier = GlanceModifier
@@ -69,6 +83,11 @@ private fun WidgetContent(walletMinutes: Int, streakDays: Int) {
                 Spacer(modifier = GlanceModifier.width(16.dp))
                 StatColumn(label = "STREAK", value = if (streakDays == 1) "1 day" else "$streakDays days", valueColor = WidgetVermillion)
             }
+            Spacer(modifier = GlanceModifier.height(6.dp))
+            Text(
+                text = status,
+                style = TextStyle(color = ColorProvider(WidgetInkSoft), fontSize = 12.sp, fontWeight = FontWeight.Bold),
+            )
             Spacer(modifier = GlanceModifier.height(12.dp))
             Box(
                 modifier = GlanceModifier

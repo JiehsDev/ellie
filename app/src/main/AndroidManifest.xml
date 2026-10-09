@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -41,6 +45,10 @@
             android:theme="@style/Theme.Jikan" />
 
         <receiver
+            android:name=".service.PauseReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".widget.JikanWidgetReceiver"
             android:exported="false">
             <intent-filter>
@@ -51,6 +59,17 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/jikan_widget_info" />
         </receiver>
+
+        <service
+            android:name=".service.PauseTileService"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="Banking Mode"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".service.AppLockAccessibilityService"

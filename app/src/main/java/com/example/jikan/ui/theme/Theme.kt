@@ -1,9 +1,12 @@
 package com.example.jikan.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.example.jikan.data.ThemeMode
 
 private val LightColorScheme = lightColorScheme(
     primary = Accent,
@@ -31,17 +34,45 @@ private val LightColorScheme = lightColorScheme(
     outline = InkFaint,
 )
 
-/**
- * The reference design (see project-context.md's screen flow + the mockups it was
- * built from) is a single warm light palette with no dark variant, so this always
- * renders light regardless of the system theme — matching a branded app rather than
- * following the device setting.
- */
+private val DarkColorScheme = darkColorScheme(
+    primary = AccentDarkMode,
+    onPrimary = Color(0xFF18213A),
+    primaryContainer = AccentContainerDark,
+    onPrimaryContainer = InkDark,
+    secondary = SageDarkMode,
+    onSecondary = Color(0xFF172416),
+    secondaryContainer = SageContainerDark,
+    onSecondaryContainer = InkDark,
+    tertiary = VermillionDarkMode,
+    onTertiary = Color(0xFF35110B),
+    tertiaryContainer = VermillionContainerDark,
+    onTertiaryContainer = InkDark,
+    error = VermillionDarkMode,
+    onError = Color(0xFF35110B),
+    errorContainer = VermillionContainerDark,
+    onErrorContainer = InkDark,
+    background = BgDark,
+    onBackground = InkDark,
+    surface = SurfaceDark,
+    onSurface = InkDark,
+    surfaceVariant = AccentContainerDark,
+    onSurfaceVariant = InkSoftDark,
+    outline = InkFaintDark,
+)
+
 @Composable
-fun JikanTheme(content: @Composable () -> Unit) {
+fun JikanTheme(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    content: @Composable () -> Unit,
+) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

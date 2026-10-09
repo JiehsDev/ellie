@@ -1,111 +1,316 @@
-# Project: Study-to-Unlock (working title)
+# Jikan Project Context
 
-## Problem
-Student user has a lot of academic work to do but is stuck in a habit of doomscrolling (TikTok, etc.) and playing games (e.g. Mobile Legends), which eats into study/focus time. Persona also wants to learn Japanese, so the solution ties the "unlock" mechanic directly to Japanese study rather than a generic focus timer.
+This file is the handoff brief for any AI or human contributor working on Jikan. Read it before changing code.
 
-## Target platform
-Android only for now (dominant OS share among Filipino users — this is a Philippines-focused build). iOS deliberately deferred; Apple's Screen Time / Family Controls frameworks are more restrictive and would need a separate implementation pass later.
+## Product Vision
 
-## Core concept
-Distracting apps are locked by default. To unlock time on them, the user studies Japanese (starting with hiragana) and passes a quiz. Credits earned are a universal currency — 1 credit ≈ 1 minute, spendable on ANY locked app (not per-app separate balances).
+Jikan is an Android app that helps a student trade focused Japanese study for intentional access to distracting apps.
 
-## Credit economy rules
-- Credits awarded **per correct answer**, not pass/fail gated (e.g. ~1.5–2 min per correct answer out of 10 questions per quiz).
-- No credit for unanswered/skipped questions.
-- Missed questions get queued into spaced repetition for the next session, not just discarded.
-- Perfect score gives a small bonus.
-- Streak bonus: consecutive days of study sessions increase earn-rate slightly (e.g. +10%).
-- Soft daily cap / diminishing returns: grinding many sessions back-to-back in one day yields progressively fewer credits per session, to prevent pure credit-farming while still allowing free additional studying.
-- "Keep studying" option added on the results screen (secondary button, below the primary "Continue to [app]" button) — lets a user who's in the groove chain directly into another lesson without routing back through the lock/redirect screen.
+The core loop is simple:
 
-## Content & SRS structure
-- Progression tiers: Hiragana (Set 1 vowels → k-row → s-row... full 46) → Katakana → basic vocab using only learned kana → basic kanji radicals → short vocab/phrases.
-- MVP scope: **ship hiragana only first**, recognition-based quiz types only. Defer katakana/vocab tiers and stroke-order tracing until the core loop is validated.
-- Each card: character, romaji, audio clip, stroke order data (deferred for MVP), optional mnemonic, tier.
-- SRS: simplified SM-2 (like Anki). Correct answer → interval grows (1 day → 3 → 7 → 14...). Wrong answer → interval resets, card requeued within the same session for immediate reinforcement.
-- Quiz question types (MVP): character→sound, sound→character (multiple choice / tap). Stroke tracing deferred (complex to build/validate).
-- Runs fully offline — no backend needed for content or SRS state.
+1. The user chooses distracting apps to lock.
+2. Jikan blocks those apps when the user's time wallet is empty.
+3. The user studies Japanese, starting with hiragana.
+4. Correct answers earn minutes.
+5. Earned minutes can be spent on any locked app.
 
-## App-locking mechanism (decided: redirect, not overlay)
-Originally considered a full-screen overlay (`TYPE_APPLICATION_OVERLAY`) drawn on top of the blocked app. **Decision: use redirect instead** — feels more native, avoids `SYSTEM_ALERT_WINDOW` permission, less "malware-like" UX. Overlay was ruled out specifically for hurting the experience.
+Jikan should feel firm but kind. It is not a punishment app. It is a study companion and app-lock guardian that helps the user pause, learn, and return to apps with intention.
+
+The current product personality is embodied by **Jikan Coach**, a mascot shown through `JikanCoachMessage`. The coach should feel observant, warm, calm, slightly playful, and emotionally present. It should never shame the user, guilt-trip them, exaggerate danger, or pressure them into excessive studying.
+
+## Product Inspirations
+
+Pattern references:
+
+- Duolingo-style bite-sized lessons, quiz feedback, progress, and streak motivation.
+- Native Android app-lock flows, using redirect rather than overlays.
+- Tarsi by Bryl Lim as a reference for an interactable AI-like mascot inside a utility app.
+
+Do not clone these products. Use them as pattern references for quality, tone, and interaction design.
+
+## Target Platform
+
+Android only for now.
+
+The app is Philippines-focused, where Android is the practical target. iOS is deferred because Screen Time / Family Controls would require a different implementation.
+
+Current app constraints:
+
+- Kotlin + Jetpack Compose.
+- Room for local persistence.
+- Coroutines + Flow for reactive state.
+- AccessibilityService for app locking.
+- WorkManager for background checks and expiry tasks.
+- Local-first/offline-first.
+- No backend required for MVP.
+- Current min SDK is API 29 because the local llama.cpp Android binding targets API 29+ and arm64.
+- Current native AI packaging is arm64-v8a only.
+
+## Core Economy
+
+The wallet is a universal time balance.
+
+- 1 minute in the wallet can be spent on any locked app.
+- Credits are earned from study sessions.
+- Credit awards are proportional to correct answers, not pass/fail only.
+- Missed cards should be queued for review through SRS.
+- Perfect score gives a bonus.
+- Streaks slightly improve earning.
+- Daily grinding should have diminishing returns.
+- Wallet has a max cap, currently `Wallet.MAX_BALANCE_MINUTES`.
+
+The user should always understand why they earned or did not earn minutes.
+
+## Study Scope
+
+MVP study content is hiragana recognition.
+
+Implemented/expected direction:
+
+- Hiragana cards are seeded locally.
+- Lesson screen shows kana, audio, romaji/mnemonic style learning.
+- Quiz screen uses multiple choice.
+- SRS is simplified SM-2-like logic.
+- Wrong answers should be reinforced.
+
+Deferred:
+
+- Katakana.
+- Vocab.
+- Kanji/radicals.
+- Stroke-order tracing.
+- Social/accountability features.
+
+## App Locking Model
+
+Jikan uses **redirect**, not overlay.
+
+Reason:
+
+- Feels more native.
+- Avoids `SYSTEM_ALERT_WINDOW`.
+- Less malware-like.
+- Easier to reason about.
 
 Mechanism:
-- `AccessibilityService` listens for `TYPE_WINDOW_STATE_CHANGED` events.
-- When a blocked package comes to foreground and wallet balance <= 0, fire an `Intent` with `FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TOP` to launch the app's own lock/lesson screen.
-- Trade-off accepted: brief flash (a few hundred ms) of the blocked app before redirect fires, in exchange for a more native feel and simpler implementation.
 
-**Back-button handling:** Override `onBackPressed()` on the lock screen to call `moveTaskToBack(true)` (send to home), not back into the blocked app's stack (which is already cleared via `FLAG_ACTIVITY_CLEAR_TOP` anyway).
+- `AppLockAccessibilityService` watches foreground app changes.
+- If a locked app opens and no wallet time is available, Jikan launches its own lock flow.
+- The user studies to earn minutes or returns home.
+- Brief flashes of the blocked app are acceptable trade-offs.
 
-**Reopen race mitigation:**
-- Don't rely on a single event; also run periodic re-checks (~300–500ms) confirming current foreground package isn't blocked.
-- Track `lastRedirectTimestamp` per package; if the same blocked package reappears within 1–2 sec of last redirect, skip re-check and go straight to lock screen (avoid flicker loop).
-- If a user rapid-reopens 5+ times in 10 seconds, treat as a UX signal (frustration) rather than just a technical bug — consider a softer "take a break" message instead of repeat-firing the lock screen.
+Important reliability areas:
 
-**Service survival / OEM battery optimization:** Accessibility Services persist even if the app's UI task is force-closed, but aggressive OEM battery optimization (notably Xiaomi, Oppo, Vivo — common in the Philippines) can kill background services unless whitelisted. Onboarding must explicitly walk through battery optimization exemption + "autostart" toggles for these OEMs (detect via `Build.MANUFACTURER`).
+- Accessibility service can be killed or disabled by Android/OEM behavior.
+- Jikan must show protection health clearly.
+- Re-check protection on app resume.
+- Watch out for Xiaomi/Oppo/Vivo-style battery restrictions.
 
-## Screen flow (designed, mockups already produced)
-1. **Onboarding — Welcome**: problem framing, "Get started"
-2. **Onboarding — App picker**: checkbox list of installed apps to lock (e.g. TikTok, Mobile Legends)
-3. **Onboarding — Study preferences**: session length slider (default ~10–15 min, range 5–30), daily goal preset (Casual/Serious)
-4. **Onboarding — Accessibility permission**: guided screen explaining why, deep-links to system settings (step X of 3 indicator)
-5. **Onboarding — Battery/autostart permission**: guided screen, OEM-specific note shown conditionally
-6. **Onboarding — All set**: confirmation, CTA into first lesson
-7. **Lock/redirect screen**: replaces overlay concept — this is now the app's own entry screen shown on redirect. Shows blocked app context, "Start lesson" CTA, no skip option.
-8. **Lesson screen**: flashcard flow — character, audio playback, romaji + mnemonic reveal, progress bar, next.
-9. **Quiz screen**: one question at a time, multiple choice, immediate visual feedback per tap, progress indicator.
-10. **Results screen**: score, credits earned, wallet balance, missed items queued note, primary CTA "Continue to [app]", secondary CTA "Keep studying" (chains into next lesson).
-11. **Home dashboard**: wallet balance, streak, tier progress bar, "Study now" quick action.
-12. **Settings**: edit locked app list, session length, daily goal, permission health re-check.
+## Banking Mode And Strict Mode
 
-Design reference points used: Duolingo's design system (flashcard/quiz pattern, gamified feedback, progress bars) and dedicated Android app-lock UI kits, sourced via Figma Community search — not copied, used as a quality/pattern benchmark.
+Banking mode exists so the user can temporarily disable protection for sensitive or necessary tasks.
 
-## Tech stack (decided)
-- Kotlin + Jetpack Compose
-- Room (SQLite) for all local persistence — cards, SRS progress, wallet, sessions, settings
-- Kotlin Coroutines + Flow for async/reactive state
-- AccessibilityService + WorkManager for detection and periodic re-checks
-- MediaPlayer/ExoPlayer for kana audio playback
-- No backend/server for MVP — fully offline
-- Firebase Analytics or self-hosted analytics — optional, later, once there are real users
-- Min SDK target: API 26 (Android 8.0) — covers most active Filipino Android devices, supports Accessibility Service + WorkManager fully
+Tone:
 
-## Suggested project structure
+- Be transparent.
+- Do not hide that protection is off.
+- Coach should gently remind the user to turn protection back on.
+
+Strict/protection health states should always win over playful messages. If protection is off, the user needs clear safety-state information first.
+
+## Jikan Coach
+
+Jikan Coach is the mascot/personality layer.
+
+Existing component:
+
+- `com.example.jikan.ui.coach.JikanCoachMessage`
+- Reuse this visual component. Do not redesign it casually.
+- It supports an optional click handler.
+
+Rule-based home/event brain:
+
+- `com.example.jikan.ui.home.HomeCoachMessageProvider`
+- `CoachInput`
+- `CoachEvent`
+- `CoachMood`
+
+The coach is currently rule-based for Home, Lock, and Results screens. This is intentional. Important product states must be deterministic and safe.
+
+Coach personality:
+
+- Calm.
+- Observant.
+- Supportive.
+- Slightly playful.
+- Patient.
+- Never judgmental.
+- Never guilt/shame/fear based.
+- No excessive emojis.
+- Two sentences max for most UI messages.
+
+Examples of the desired voice:
+
+- "I see the Loopy urge. Very human. Earn a few minutes first, then go be mysterious online."
+- "That was clean work: 10/10. I am quietly proud, which is still proud."
+- "I can't guard your apps right now. Turn Jikan back on in Accessibility and I'll take watch again."
+
+Coach rules:
+
+- Protection/banking warnings have priority over streak/wallet/fun messages.
+- Do not call AI/inference for safety-critical text.
+- Prefer local rule-based messages for frequent UI states.
+- Use AI only as a soft rewrite/summary layer when failure is safe.
+- If local AI fails, fallback copy must still be useful.
+
+## Local AI Direction
+
+Jikan has an experimental local AI path for coach summaries.
+
+Current model target:
+
+- Hugging Face repo: `mfuntowicz/SmolLM2-360M-Instruct-Q4_K_M-GGUF`
+- File: `smollm2-360m-instruct-q4_k_m.gguf`
+- Version label: `SmolLM2-360M-Instruct-Q4_K_M`
+
+Current implementation pieces:
+
+- `AiCoach`
+- `RealAiCoach`
+- `FakeAiCoach`
+- `InferenceEngine`
+- `LlamaCppEngine`
+- `ModelManager`
+- `AiPromptBuilder`
+- `AiInsightEntity` / DAO
+
+Native runtime:
+
+- Vendored submodule: `libs/llama.kt`
+- Gradle module: `:llama-kt`
+- CPU-only CMake patch currently applied for reliable builds.
+- OpenCL/Vulkan acceleration was disabled because generated shaders/headers were missing.
+
+Important:
+
+- The app can compile/package local llama support.
+- On-device generation still needs real-device validation with model download, memory, latency, and output quality.
+- Do not make core UX depend entirely on local AI.
+- Keep deterministic fallback copy.
+
+## Main Architecture Map
+
+Important packages:
+
+- `data/`: Room entities, DAOs, database, repository.
+- `srs/`: spaced repetition logic.
+- `study/`: session state, quiz generation, credit calculation.
+- `ui/home/`: dashboard state, coach provider, home screen.
+- `ui/coach/`: mascot message visual.
+- `ui/lesson/`: lesson screen.
+- `ui/quiz/`: quiz screen.
+- `ui/results/`: session results.
+- `ui/lock/`: redirect/lock screen.
+- `ui/onboarding/`: setup flow.
+- `ui/settings/`: locked app and protection settings.
+- `service/`: accessibility, pause/banking, watchdog workers.
+- `widget/`: app widget.
+- `coach/`: local AI interfaces and inference path.
+
+## Current Home Dashboard Direction
+
+Home should be the user's control room:
+
+- Greeting.
+- Jikan Coach message.
+- Protection/banking/strict state.
+- Wallet dial.
+- Study CTA.
+- Stats ledger.
+- Locked app shortcuts/status.
+- Week strip.
+- Theme selector currently exists.
+
+Keep the dashboard practical. Avoid turning it into a marketing page.
+
+## UI Design Guidance
+
+Jikan should feel warm, focused, and companion-like, not corporate.
+
+Use:
+
+- Calm but distinctive typography.
+- Clear hierarchy.
+- Dense enough information for repeated use.
+- The mascot for emotional/contextual support.
+- Neumorphic-ish app styling only where already established by local components.
+
+Avoid:
+
+- Guilt copy.
+- Cluttered dashboards.
+- Excessive cards inside cards.
+- Decorative blobs/orbs.
+- Big marketing hero sections.
+- Rebuilding existing components without need.
+
+## Contribution Rules
+
+Before changing code:
+
+1. Read this file.
+2. Inspect the existing implementation.
+3. Preserve user changes and uncommitted work.
+4. Prefer small, local changes.
+5. Add or update tests for pure logic.
+6. Run relevant Gradle checks.
+
+Preferred checks:
+
+```powershell
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat assembleDebug
 ```
-app/
-  data/
-    Card.kt, UserCardProgress.kt, Session.kt, Wallet.kt   (Room entities)
-    AppDatabase.kt
-    CardDao.kt, ProgressDao.kt
-  srs/
-    SrsEngine.kt        (SM-2-lite logic, plain Kotlin, no Android deps — unit testable)
-  ui/
-    onboarding/
-    lesson/
-    quiz/
-    home/
-  service/
-    AppLockAccessibilityService.kt
-res/
-  raw/       (kana audio clips)
-  assets/    (seed JSON for card content)
-```
 
-## Build milestones (in order)
-1. Core data layer — Room entities, seed hiragana JSON, SM-2-lite SRS class (testable independent of UI)
-2. Lesson + quiz screens in Compose, wired to real SRS
-3. Wallet + credit economy — proportional credits per correct answer, daily soft cap, streaks
-4. App detection + redirect — AccessibilityService, back-button override, reopen-race handling
-5. Onboarding + permissions flow, including OEM-specific battery/autostart handling
-6. Home dashboard + settings
-7. Polish pass — empty/error states, permission-revoked banner, app icon/splash
+Use `assembleDebug` after changes touching:
 
-## Explicitly deferred / cut from MVP
-- Stroke-order tracing (start with recognition-only quiz types)
-- Katakana, vocab, and kanji tiers (hiragana-only launch)
-- Social/accountability features (solo loop first)
-- Play Store polish, marketing assets (until core loop validated with real testers — classmates suggested as first test group)
-- iOS version (Screen Time / Family Controls framework — separate, more restricted implementation)
+- Compose UI with resources.
+- Manifest.
+- Gradle.
+- Native llama module.
+- Accessibility/service declarations.
 
-## Known highest-risk areas to test early, on real devices (not just emulator)
-- AccessibilityService reliability across OEM skins common in the Philippines (Xiaomi, Oppo, Vivo)
-- The reopen race / redirect debounce logic
+## Testing Priorities
+
+Highest risk areas:
+
+- Accessibility redirect reliability on real devices.
+- OEM battery/autostart behavior.
+- Banking mode transitions and protection recovery.
+- Strict mode false positives.
+- Wallet accounting.
+- SRS scheduling.
+- Local model download/load/generation on real arm64 devices.
+
+Unit-testable areas:
+
+- `CreditCalculator`
+- `SrsEngine`
+- `QuizGenerator`
+- `HomeCoachMessageProvider`
+- `AiPromptBuilder`
+- protection/status calculators
+
+## Agent Notes
+
+If you are an AI agent working here:
+
+- Do not invent backend infrastructure unless asked.
+- Do not replace local rule-based safety messages with generative AI.
+- Do not remove fallback behavior.
+- Do not casually raise app complexity.
+- Do not revert unrelated dirty files.
+- Keep Jikan Coach emotionally intelligent, not noisy.
+- When in doubt, make the app more trustworthy, clearer, and kinder.
+
+The north star: **Jikan helps the user interrupt distraction with a tiny act of learning, then gives time back with dignity.**

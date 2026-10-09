@@ -23,5 +23,6 @@ sealed interface StudyPhase {
         val creditsEarned: Int,
         val walletBalance: Int,
         val isPerfect: Boolean,
+        val aiSummary: String? = null,
     ) : StudyPhase
 }

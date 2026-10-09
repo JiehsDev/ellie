@@ -19,6 +19,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.jikan.ui.coach.JikanCoachMessage
+import com.example.jikan.ui.home.HomeCoachMessageProvider
 import com.example.jikan.ui.theme.JikanTheme
 import com.example.jikan.ui.theme.NeoCard
 import com.example.jikan.ui.theme.PillButton
@@ -68,6 +70,13 @@ fun LockScreen(
             text = "Wallet: $walletBalanceMinutes min available",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(18.dp))
+        JikanCoachMessage(
+            message = HomeCoachMessageProvider.lockMessage(
+                appLabel = blockedAppLabel,
+                walletBalanceMinutes = walletBalanceMinutes,
+            )
         )
         Spacer(Modifier.height(48.dp))
         PillButton(text = "Start lesson", onClick = onStartLesson, modifier = Modifier.fillMaxWidth())

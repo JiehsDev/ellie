@@ -61,6 +61,7 @@ fun StudySessionScreen(
             walletBalance = current.walletBalance,
             isPerfect = current.isPerfect,
             unlockedAppLabel = unlockedAppLabel,
+            aiSummary = current.aiSummary,
             onContinue = onContinue,
             onKeepStudying = viewModel::onKeepStudying,
             modifier = modifier,

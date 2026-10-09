@@ -8,6 +8,8 @@ data class Wallet(
     @PrimaryKey val id: Int = SINGLETON_ID,
     val creditBalanceMinutes: Int = 0,
     val lifetimeCreditsEarned: Int = 0,
+    val currentStreakDays: Int = 0,
+    val lastStudyEpochDay: Long = 0L,
 ) {
     companion object {
         const val SINGLETON_ID = 1
