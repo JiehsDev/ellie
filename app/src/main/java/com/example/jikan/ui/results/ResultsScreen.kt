@@ -127,7 +127,7 @@ fun ResultsScreen(
             )
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
@@ -141,7 +141,7 @@ fun ResultsScreen(
         Box(contentAlignment = Alignment.TopEnd) {
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(120.dp)
                     .clip(CircleShape)
