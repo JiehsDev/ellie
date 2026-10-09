@@ -447,7 +447,7 @@ fun EarningSetupScreen(
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                text = "Jikan measures verified foreground practice duration. In-app lesson scores, " +
+                text = "Ellie measures verified foreground practice duration. In-app lesson scores, " +
                     "quiz results, and private user credentials are never inspected.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -475,7 +475,7 @@ fun EarningSetupScreen(
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    text = "Jikan Rhythm Coach",
+                    text = "Ellie Rhythm Coach",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
