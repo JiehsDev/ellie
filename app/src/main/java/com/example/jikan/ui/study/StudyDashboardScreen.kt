@@ -113,7 +113,7 @@ fun StudyDashboardScreen(
             Spacer(Modifier.width(12.dp))
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
@@ -225,7 +225,7 @@ private fun CoachCard(message: String) {
         Box(contentAlignment = Alignment.BottomEnd) {
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
@@ -250,7 +250,7 @@ private fun CoachCard(message: String) {
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Jikan Coach · $pacing",
+                text = "Ellie · $pacing",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
