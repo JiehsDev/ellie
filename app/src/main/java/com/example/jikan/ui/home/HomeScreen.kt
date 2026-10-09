@@ -1001,7 +1001,7 @@ private fun StrictStatusBanner(state: HomeUiState) {
         else -> "Strict mode"
     }
     val body = when {
-        bankingActive -> "Protection is off for banking. Find Jikan in Accessibility and turn it on when you're done."
+        bankingActive -> "Protection is off for banking. Find Ellie in Accessibility and turn it on when you're done."
         graceActive -> {
             val minutes = ((state.strictGraceUntilMs - now) / 60_000L).coerceAtLeast(1)
             "Protection is off. Re-enable Jikan within ${minutes}m to avoid a wallet penalty."
@@ -1110,7 +1110,7 @@ private fun BankingModeDialog(
                 }
             },
             title = { Text("Protection is off") },
-            text = { Text("When you're done, open Accessibility settings, find Jikan in the list, and turn it on.") },
+            text = { Text("When you're done, open Accessibility settings, find Ellie in the list, and turn it on.") },
         )
     }
 }
@@ -1131,7 +1131,7 @@ private fun ProtectionBanner(onFix: () -> Unit) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Locked apps open freely until you turn Jikan back on in Accessibility.",
+            text = "Locked apps open freely until you turn Ellie back on in Accessibility.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onErrorContainer,
         )
@@ -1165,7 +1165,7 @@ private fun BatteryWarningBanner(onFix: () -> Unit) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Your phone may stop Jikan in the background. Exempt Jikan from battery optimizations for reliable locking.",
+            text = "Your phone may stop Ellie in the background. Exempt Ellie from battery optimizations for reliable locking.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
         )
