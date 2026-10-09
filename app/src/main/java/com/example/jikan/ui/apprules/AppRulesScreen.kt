@@ -432,7 +432,7 @@ fun AppRulesScreen(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Release App from Jikan Supervision",
+                text = "Release App from Ellie Supervision",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.tertiary,
