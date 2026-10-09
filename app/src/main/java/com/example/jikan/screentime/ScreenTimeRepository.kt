@@ -35,14 +35,21 @@ class ScreenTimeRepository(
 
         val lockedApps = db.lockedAppDao().observeLocked().first()
         val earnRules = db.earnRuleDao().observeEnabled().first()
+        // Phase 5: configured daily limits are the single source of truth for
+        // the LIMITS analytics section (app_restrictions table, Phase 4).
+        // The old locked-tier -> minutes heuristic is retired; do not
+        // reintroduce a second limits source.
+        val appRestrictions = db.appRestrictionDao().observeEnabled().first()
         val packages = (todayUsage.map { it.packageName } +
             lockedApps.map { it.packageName } +
+            appRestrictions.map { it.packageName } +
             earnRules.map { it.packageName }).toSet()
         val labels = appLabelResolver.labelsFor(packages)
         val epochDay = date.toEpochDay()
 
         val earned = db.walletTransactionDao().sumMinutesByTypeForDay(WalletTransactionType.EARN, epochDay)
         val spent = db.walletTransactionDao().sumMinutesByTypeForDay(WalletTransactionType.SPEND, epochDay)
+        val walletBalance = db.walletDao().get()?.creditBalanceMinutes ?: 0
 
         val summary = ScreenTimeCalculator.summarize(
             ScreenTimeFacts(
@@ -50,15 +57,17 @@ class ScreenTimeRepository(
                 usage = todayUsage,
                 previousDayUsage = previousUsage,
                 recentDailyTotals = recentTotals,
-                restrictedLimits = lockedApps.map {
+                restrictedLimits = appRestrictions.map {
                     RestrictedAppLimit(
                         packageName = it.packageName,
-                        limitMinutes = limitForTier(it.tier),
+                        limitMinutes = it.dailyLimitMinutes,
                     )
                 },
+                lockedPackages = lockedApps.map { it.packageName }.toSet(),
                 earnRules = earnRules,
                 earnedMinutes = earned,
                 spentMinutes = spent,
+                walletBalanceMinutes = walletBalance,
                 labels = labels,
             )
         )
@@ -69,12 +78,6 @@ class ScreenTimeRepository(
         val start = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
         val end = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
         return start to end
-    }
-
-    private fun limitForTier(tier: com.example.jikan.data.LockTier): Int = when (tier) {
-        com.example.jikan.data.LockTier.LIGHT -> 60
-        com.example.jikan.data.LockTier.AVERAGE -> 30
-        com.example.jikan.data.LockTier.EXTREME -> 0
     }
 
     private companion object {

@@ -145,6 +145,27 @@ limits per app, independent of locked-app tiers and earn rules.
 Not yet built: UI for configuring restrictions (no Home redesign in this
 phase); restrictions require usage-access permission, and fail open without it.
 
+## Phase 5: Screen-Time Analytics
+
+Implemented 2026-10-09. The existing `screentime` domain
+(`ScreenTimeCalculator` / `ScreenTimeSummary` / `ScreenTimeRepository`) is the
+single analytics layer — extended, not duplicated.
+
+- `ScreenTimeSummary` gains: `walletBalanceMinutes`, `approachingApps` /
+  `atLimitApps` (80%-of-limit and exactly-at-limit bands; exceeded keeps the
+  existing `exceededApps`), `averageUsageChange` (today vs recent average),
+  `weeklyTrend` (last 7 days, oldest first), `earningApps`.
+- Limit classification is deterministic: APPROACHING = usage in [80%, 100%)
+  via integer math, AT_LIMIT = exactly at, EXCEEDED = over. AI receives the
+  summary as structured facts and must not recompute the arithmetic.
+- `ScreenTimeRepository` now sources configured limits from the
+  `app_restrictions` table (Phase 4) instead of the old locked-tier heuristic —
+  one source of truth for limits. "Restricted" for minutes/status = locked OR
+  limit-configured.
+- Tests: `ScreenTimeAnalyticsTest` (22 cases: percentage rounding, zero usage,
+  yesterday comparison, weekly averages, top-app sorting, limit
+  classification, earning/spending totals, weekly trend).
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.
