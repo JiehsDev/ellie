@@ -289,6 +289,27 @@ is untouched, and no AI is involved in blocking decisions.
 - Tests: `RestrictedAppsUiTest` (7 cases: under/at/over limit, zero-limit
   semantics, editor validation).
 
+## Phase 11: Jikan Insights
+
+Implemented 2026-10-09. Dedicated insights screen explaining screen-time
+patterns — plain rows, no analytics-dashboard over-design.
+
+- New `ui/insights/` package: `InsightsScreen.kt`, `InsightsViewModel.kt`,
+  `InsightsUi.kt` (pure display helpers).
+- Sections: COACH INSIGHT (deterministic provider observation, same message
+  Home shows) → TODAY (total / restricted / earning-app time, earned, spent)
+  → TOP APPS (ranked) → LIMITS (approaching / at limit / exceeded groups) →
+  EARNING (per-app earned minutes from the engine's progress rows) → WEEK
+  (reused `WeekStrip`, now public) → COMPARISON (today vs yesterday, today
+  vs 7-day average).
+- All numbers come from `ScreenTimeSummary` (deterministic
+  `ScreenTimeCalculator`); AI does no analytics. Per-app earned is a
+  deterministic join of earn_rules + today's progress rows.
+- Navigation: new `INSIGHTS` route; Home's SCREEN TIME hero header has an
+  "Insights →" action.
+- Tests: `InsightsUiTest` (4 cases: minute formatting, day/average
+  comparison copy).
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.

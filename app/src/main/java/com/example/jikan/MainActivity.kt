@@ -25,6 +25,7 @@ import com.example.jikan.data.AppDatabase
 import com.example.jikan.data.ThemeMode
 import com.example.jikan.ui.home.HomeScreen
 import com.example.jikan.ui.onboarding.OnboardingScreen
+import com.example.jikan.ui.insights.InsightsScreen
 import com.example.jikan.ui.settings.EarningAppsScreen
 import com.example.jikan.ui.settings.LockedAppsScreen
 import com.example.jikan.ui.settings.RestrictedAppsScreen
@@ -70,7 +71,7 @@ class MainActivity : ComponentActivity() {
         private const val REQUEST_POST_NOTIFICATIONS = 1001
     }
 }
-private enum class HomeRoute { HOME, STUDY, LOCKED_APPS, EARNING_APPS, RESTRICTED_APPS }
+private enum class HomeRoute { HOME, STUDY, LOCKED_APPS, EARNING_APPS, RESTRICTED_APPS, INSIGHTS }
 
 @Composable
 private fun AppRoot(
@@ -115,6 +116,7 @@ private fun AppRoot(
                 onOpenLockedApps = { route = HomeRoute.LOCKED_APPS },
                 onOpenEarningApps = { route = HomeRoute.EARNING_APPS },
                 onOpenRestrictedApps = { route = HomeRoute.RESTRICTED_APPS },
+                onOpenInsights = { route = HomeRoute.INSIGHTS },
             )
 
             HomeRoute.STUDY -> StudySessionScreen(
@@ -135,6 +137,11 @@ private fun AppRoot(
             )
 
             HomeRoute.RESTRICTED_APPS -> RestrictedAppsScreen(
+                modifier = modifier,
+                onBack = { route = HomeRoute.HOME },
+            )
+
+            HomeRoute.INSIGHTS -> InsightsScreen(
                 modifier = modifier,
                 onBack = { route = HomeRoute.HOME },
             )

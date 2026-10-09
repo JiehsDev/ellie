@@ -75,6 +75,7 @@ fun HomeScreen(
     onOpenLockedApps: () -> Unit,
     onOpenEarningApps: () -> Unit,
     onOpenRestrictedApps: () -> Unit,
+    onOpenInsights: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
 ) {
@@ -90,6 +91,7 @@ fun HomeScreen(
         onOpenLockedApps = onOpenLockedApps,
         onOpenEarningApps = onOpenEarningApps,
         onOpenRestrictedApps = onOpenRestrictedApps,
+        onOpenInsights = onOpenInsights,
         onDisableLockingForBanking = viewModel::disableLockingForBanking,
         onStartBankingAllowlist = viewModel::startBankingAllowlist,
         onStartFullDisableBankingMode = viewModel::startFullDisableBankingMode,
@@ -117,6 +119,7 @@ private fun HomeScreenContent(
     onOpenLockedApps: () -> Unit,
     onOpenEarningApps: () -> Unit,
     onOpenRestrictedApps: () -> Unit,
+    onOpenInsights: () -> Unit,
     onDisableLockingForBanking: () -> Unit,
     onStartBankingAllowlist: (String, String, Int) -> Unit,
     onStartFullDisableBankingMode: (Int) -> Unit,
@@ -196,7 +199,7 @@ private fun HomeScreenContent(
 
         if (summary != null) {
             Spacer(Modifier.height(18.dp))
-            ScreenTimeHero(summary = summary)
+            ScreenTimeHero(summary = summary, onOpenInsights = onOpenInsights)
         }
 
         Spacer(Modifier.height(18.dp))
@@ -381,9 +384,9 @@ private fun WalletPanel(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ScreenTimeHero(summary: ScreenTimeSummary) {
+private fun ScreenTimeHero(summary: ScreenTimeSummary, onOpenInsights: () -> Unit) {
     Column {
-        SectionHeader(title = "SCREEN TIME", action = null, onAction = null)
+        SectionHeader(title = "SCREEN TIME", action = "Insights  →", onAction = onOpenInsights)
         Spacer(Modifier.height(8.dp))
         Text(
             text = "Today",
@@ -1110,7 +1113,7 @@ private fun AppIcon(app: LockedAppChip) {
 }
 
 @Composable
-private fun WeekStrip(week: List<StudyDay>, title: String) {
+fun WeekStrip(week: List<StudyDay>, title: String) {
     val peak = (week.maxOfOrNull { it.minutes } ?: 0).coerceAtLeast(1)
     Column {
         SectionHeader(title = title, action = null, onAction = null)
@@ -1254,6 +1257,7 @@ private fun HomeScreenPreview() {
             onOpenLockedApps = {},
             onOpenEarningApps = {},
             onOpenRestrictedApps = {},
+            onOpenInsights = {},
             onDisableLockingForBanking = {},
             onStartBankingAllowlist = { _, _, _ -> },
             onStartFullDisableBankingMode = {},
