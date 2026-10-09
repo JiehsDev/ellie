@@ -31,7 +31,13 @@ fun WelcomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(text = "Jikan", fontSize = 40.sp, fontWeight = FontWeight.Bold)
+        Text(text = "Ellie", fontSize = 40.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "A little focus goes a long way.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.height(12.dp))
         Text(
             text = "Turn doomscrolling time into Japanese study time. " +

@@ -32,7 +32,7 @@ fun AccessibilityPermissionScreen(
         Text(text = "Enable Accessibility access", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Jikan uses Android's Accessibility service to notice when a locked app opens, " +
+            text = "Ellie uses Android's Accessibility service to notice when a locked app opens, " +
                 "so it can redirect you to a lesson instead. It doesn't read your screen content.",
             style = MaterialTheme.typography.bodyLarge,
         )
