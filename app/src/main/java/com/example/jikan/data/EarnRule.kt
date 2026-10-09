@@ -15,4 +15,6 @@ data class EarnRule(
     val rewardMinutes: Int,
     val dailyLimitMinutes: Int,
     val enabled: Boolean = true,
+    /** User-facing label for the activity, e.g. "Daily Language Practice". */
+    val label: String = "",
 )

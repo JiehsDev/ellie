@@ -205,6 +205,12 @@ private val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+private val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `earn_rules` ADD COLUMN `label` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 @Database(
     entities = [
         Card::class,
@@ -224,7 +230,7 @@ private val MIGRATION_12_13 = object : Migration(12, 13) {
         EarningAppProgress::class,
         AppRestriction::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -269,6 +275,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
+                        MIGRATION_13_14,
                     )
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()

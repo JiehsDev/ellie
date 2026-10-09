@@ -9,13 +9,25 @@ import com.example.jikan.coach.StudySessionData
 import com.example.jikan.data.AppDatabase
 import com.example.jikan.data.Card
 import com.example.jikan.data.CardSeeder
+import com.example.jikan.data.DailyGoalPreset
 import com.example.jikan.data.StudyRepository
+import com.example.jikan.srs.RecallGrade
+import com.example.jikan.srs.SrsEngine
+import com.example.jikan.srs.SrsState
 import com.example.jikan.widget.WidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 
+/**
+ * Anki-style review flow: each card is shown with its answer and the user
+ * grades their recall (Again/Hard/Good/Easy). Grading records the SRS
+ * result and advances. When the queue is done, the session completes.
+ */
 class StudySessionViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
     private val repository = StudyRepository(db.cardDao(), db.progressDao(), db.sessionDao(), db.walletDao(), db.settingsDao())
@@ -23,9 +35,15 @@ class StudySessionViewModel(application: Application) : AndroidViewModel(applica
     private val _phase = MutableStateFlow<StudyPhase>(StudyPhase.Loading)
     val phase: StateFlow<StudyPhase> = _phase.asStateFlow()
 
-    private val quizQuestions = mutableListOf<QuizQuestion>()
     private var sessionCards: List<Card> = emptyList()
     private var sessionStartedAt: Long = 0L
+    private var sessionLengthMinutes: Int = 12
+    // Session-complete stats: per-card recall latency, SRS interval growth,
+    // and grade counts (correct = anything but AGAIN).
+    private var cardShownAtMs: Long = 0L
+    private val recallDurationsMs = mutableListOf<Long>()
+    private val intervalGrowthDays = mutableListOf<Double>()
+    private val grades = mutableListOf<RecallGrade>()
 
     init {
         startSession()
@@ -42,78 +60,90 @@ class StudySessionViewModel(application: Application) : AndroidViewModel(applica
             }
             sessionCards = cards
             sessionStartedAt = System.currentTimeMillis()
-            _phase.value = StudyPhase.Lesson(cards, index = 0)
+            sessionLengthMinutes = db.settingsDao().get()?.sessionLengthMinutes ?: 12
+            recallDurationsMs.clear()
+            intervalGrowthDays.clear()
+            grades.clear()
+            showCard(0)
         }
     }
 
-    fun onLessonNext() {
-        val current = _phase.value as? StudyPhase.Lesson ?: return
-        if (current.index + 1 < current.cards.size) {
-            _phase.value = current.copy(index = current.index + 1)
-        } else {
-            startQuiz()
+    private suspend fun showCard(index: Int) {
+        val card = sessionCards[index]
+        val progress = db.progressDao().getForCard(card.id)
+        val state = progress?.let { SrsState(it.intervalDays, it.easeFactor, it.repetitions) }
+            ?: SrsEngine.INITIAL_STATE
+        val now = System.currentTimeMillis()
+        val previews = RecallGrade.entries.associateWith { grade ->
+            SrsEngine.gradePreviewText(state, grade, now)
         }
-    }
-
-    private fun startQuiz() {
-        viewModelScope.launch {
-            val pool = repository.getAllCardsOnce()
-            quizQuestions.clear()
-            quizQuestions += QuizGenerator.buildQuiz(sessionCards, pool)
-            _phase.value = StudyPhase.Quiz(quizQuestions.toList(), index = 0, correctCount = 0)
-        }
-    }
-
-    fun onAnswerSelected(answer: String) {
-        val current = _phase.value as? StudyPhase.Quiz ?: return
-        if (current.selectedAnswer != null) return
-        val question = current.questions[current.index]
-        val wasCorrect = answer == question.correctAnswer
-        val updatedCorrectCount = if (wasCorrect) current.correctCount + 1 else current.correctCount
-
-        _phase.value = current.copy(
-            selectedAnswer = answer,
-            isAnswerCorrect = wasCorrect,
-            correctCount = updatedCorrectCount,
+        val earnedToday = earnedTodayMinutes(now)
+        val elapsedMin = ((now - sessionStartedAt) / 60_000L).toInt()
+        cardShownAtMs = now
+        _phase.value = StudyPhase.Lesson(
+            cards = sessionCards,
+            index = index,
+            cardState = state,
+            gradePreviews = previews,
+            earnedTodayMinutes = earnedToday,
+            unlockInMinutes = (sessionLengthMinutes - elapsedMin).coerceAtLeast(0),
+            sessionLengthMinutes = sessionLengthMinutes,
         )
+    }
+
+    fun onGradeSelected(grade: RecallGrade) {
+        val current = _phase.value as? StudyPhase.Lesson ?: return
+        val card = current.cards[current.index]
+
+        // Recall latency: time from card shown to grade tapped.
+        if (cardShownAtMs > 0L) {
+            recallDurationsMs += System.currentTimeMillis() - cardShownAtMs
+            cardShownAtMs = 0L
+        }
+        grades += grade
 
         viewModelScope.launch {
-            repository.recordAnswer(question.card.id, wasCorrect)
-            if (!wasCorrect) {
-                val pool = repository.getAllCardsOnce()
-                quizQuestions += QuizGenerator.buildQuestion(question.card, pool)
-                val latest = _phase.value as? StudyPhase.Quiz ?: return@launch
-                _phase.value = latest.copy(questions = quizQuestions.toList())
+            val growth = repository.recordGrade(card.id, grade)
+            intervalGrowthDays += growth
+            val nextIndex = current.index + 1
+            if (nextIndex < current.cards.size) {
+                showCard(nextIndex)
+            } else {
+                finishSession()
             }
         }
     }
 
-    fun onQuizNext() {
-        val current = _phase.value as? StudyPhase.Quiz ?: return
-        val nextIndex = current.index + 1
-        if (nextIndex < current.questions.size) {
-            _phase.value = current.copy(index = nextIndex, selectedAnswer = null, isAnswerCorrect = null)
-        } else {
-            finishSession(current)
-        }
+    fun onBack() {
+        // Abandoning mid-session: go back without completing.
+        _phase.value = StudyPhase.Empty
     }
 
-    private fun finishSession(quiz: StudyPhase.Quiz) {
+    private suspend fun earnedTodayMinutes(now: Long): Int {
+        val zone = ZoneId.systemDefault()
+        val startOfDay = Instant.ofEpochMilli(now).atZone(zone)
+            .toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
+        return db.sessionDao().getSince(startOfDay).sumOf { it.creditsEarned }
+    }
+
+    private fun finishSession() {
         viewModelScope.launch {
-            val total = quiz.questions.size
+            val total = grades.size
+            val correctCount = grades.count { it != RecallGrade.AGAIN }
+            val now = System.currentTimeMillis()
             val result = repository.completeSession(
-                correctCount = quiz.correctCount,
+                correctCount = correctCount,
                 totalCount = total,
                 sessionStartedAt = sessionStartedAt,
             )
             WidgetUpdater.refresh(getApplication())
 
-            val durationMin = ((System.currentTimeMillis() - sessionStartedAt) / 60_000L).toInt().coerceAtLeast(1)
-            val accuracy = if (total > 0) (quiz.correctCount * 100) / total else 0
+            val durationMin = ((now - sessionStartedAt) / 60_000L).toInt().coerceAtLeast(1)
+            val accuracy = if (total > 0) (correctCount * 100) / total else 0
             val sessionData = StudySessionData(
                 cardsReviewed = total,
-                correctAnswers = quiz.correctCount,
-                incorrectAnswers = total - quiz.correctCount,
+                correctAnswers = correctCount,
+                incorrectAnswers = total - correctCount,
                 accuracyPercent = accuracy,
                 durationMinutes = durationMin,
                 creditsEarned = result.creditsEarned,
@@ -127,13 +157,46 @@ class StudySessionViewModel(application: Application) : AndroidViewModel(applica
             val summary = coach.summarizeSession(sessionData)
             coach.saveInsight(sessionStartedAt, summary)
 
+            // Session-complete dashboard data (all real, no placeholders).
+            val zone = ZoneId.systemDefault()
+            val startOfDay = Instant.ofEpochMilli(now).atZone(zone)
+                .toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
+            val todaysSessions = db.sessionDao().getSince(startOfDay)
+            val earnedToday = todaysSessions.sumOf { it.creditsEarned }
+            val studyMinutesToday = todaysSessions.sumOf {
+                val end = it.completedAt ?: now
+                ((end - it.startedAt) / 60_000L).toInt().coerceAtLeast(0)
+            }
+            val settings = db.settingsDao().get()
+            val goalMinutes = when (settings?.dailyGoalPreset) {
+                DailyGoalPreset.SERIOUS -> 45
+                else -> 30
+            }
+            val dueCount = try {
+                db.progressDao().observeDueCount(now).first()
+            } catch (_: Exception) { 0 }
+            val lockedLabels = try {
+                db.lockedAppDao().observeLocked().first()
+                    .map { it.appLabel }.take(7)
+            } catch (_: Exception) { emptyList() }
+
             _phase.value = StudyPhase.Results(
-                correctCount = quiz.correctCount,
+                correctCount = correctCount,
                 totalCount = total,
                 creditsEarned = result.creditsEarned,
                 walletBalance = result.walletBalance,
                 isPerfect = result.isPerfect,
                 aiSummary = summary.text,
+                durationSeconds = ((now - sessionStartedAt) / 1000).toInt().coerceAtLeast(0),
+                earnedTodayMinutes = earnedToday,
+                avgRecallSeconds = if (recallDurationsMs.isNotEmpty())
+                    recallDurationsMs.average() / 1000.0 else 0.0,
+                avgIntervalGrowthDays = if (intervalGrowthDays.isNotEmpty())
+                    intervalGrowthDays.average() else 0.0,
+                studyMinutesToday = studyMinutesToday,
+                dailyGoalMinutes = goalMinutes,
+                dueCount = dueCount,
+                lockedAppLabels = lockedLabels,
             )
         }
     }

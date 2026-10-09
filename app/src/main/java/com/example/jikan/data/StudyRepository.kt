@@ -1,5 +1,6 @@
 package com.example.jikan.data
 
+import com.example.jikan.srs.RecallGrade
 import com.example.jikan.srs.SrsEngine
 import com.example.jikan.srs.SrsState
 import com.example.jikan.study.CreditCalculator
@@ -31,10 +32,39 @@ class StudyRepository(
 
     suspend fun getAllCardsOnce(): List<Card> = cardDao.getAllOnce()
 
-    suspend fun recordAnswer(cardId: Long, wasCorrect: Boolean, now: Long = System.currentTimeMillis()) {
+    /**
+     * Records a recall grade and returns the interval growth in days
+     * (new interval minus old interval) for session stats.
+     */
+    suspend fun recordGrade(cardId: Long, grade: RecallGrade, now: Long = System.currentTimeMillis()): Double {
         val existing = progressDao.getForCard(cardId)
         val state = existing?.let { SrsState(it.intervalDays, it.easeFactor, it.repetitions) }
             ?: SrsEngine.INITIAL_STATE
+        val oldInterval = state.intervalDays
+        val result = SrsEngine.reviewGrade(state, grade, now)
+        progressDao.upsert(
+            UserCardProgress(
+                id = existing?.id ?: 0,
+                cardId = cardId,
+                intervalDays = result.intervalDays,
+                easeFactor = result.easeFactor,
+                repetitions = result.repetitions,
+                dueAt = result.dueAt,
+                lastReviewedAt = now,
+            )
+        )
+        return result.intervalDays - oldInterval
+    }
+
+    /**
+     * Records an answer and returns the interval growth in days
+     * (new interval minus old interval) for session stats.
+     */
+    suspend fun recordAnswer(cardId: Long, wasCorrect: Boolean, now: Long = System.currentTimeMillis()): Double {
+        val existing = progressDao.getForCard(cardId)
+        val state = existing?.let { SrsState(it.intervalDays, it.easeFactor, it.repetitions) }
+            ?: SrsEngine.INITIAL_STATE
+        val oldInterval = state.intervalDays
         val result = SrsEngine.review(state, wasCorrect, now)
         progressDao.upsert(
             UserCardProgress(
@@ -47,6 +77,7 @@ class StudyRepository(
                 lastReviewedAt = now,
             )
         )
+        return result.intervalDays - oldInterval
     }
 
     suspend fun completeSession(
