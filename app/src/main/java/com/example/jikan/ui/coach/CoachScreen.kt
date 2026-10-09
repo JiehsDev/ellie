@@ -91,7 +91,7 @@ fun CoachScreen(
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Jikan Coach",
+                    text = "Ellie",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -111,7 +111,7 @@ fun CoachScreen(
             Spacer(Modifier.width(12.dp))
             Image(
                 painter = painterResource(R.drawable.mascot_jikan_coach),
-                contentDescription = "JikanCoach",
+                contentDescription = "Ellie",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
@@ -132,7 +132,7 @@ fun CoachScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(R.drawable.mascot_jikan_coach),
-                    contentDescription = "JikanCoach",
+                    contentDescription = "Ellie",
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
@@ -147,7 +147,7 @@ fun CoachScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = "Jikan Mindful Coach",
+                        text = "Ellie Mindful Coach",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,

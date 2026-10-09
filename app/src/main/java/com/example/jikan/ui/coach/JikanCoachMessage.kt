@@ -73,7 +73,7 @@ fun JikanCoachMessage(
 private fun CoachMascot(modifier: Modifier = Modifier) {
     Image(
         painter = painterResource(R.drawable.mascot_jikan_coach),
-        contentDescription = "Jikan Coach",
+        contentDescription = "Ellie",
         modifier = modifier
             .size(76.dp)
             .clip(RoundedCornerShape(RadiusSm))
@@ -96,7 +96,7 @@ private fun CoachBubble(
     ) {
         Column {
             Text(
-                text = "Jikan Coach",
+                text = "Ellie",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
