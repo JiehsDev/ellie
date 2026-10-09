@@ -229,7 +229,7 @@ private fun BankingModeDialog(
             confirmButton = {},
             icon = { CircularProgressIndicator() },
             title = { Text("Turning off protection") },
-            text = { Text("Jikan is turning off its Accessibility service for banking mode.") },
+            text = { Text("Ellie is turning off its Accessibility service for banking mode.") },
         )
         BankingModeStatus.Success -> AlertDialog(
             onDismissRequest = onDismiss,

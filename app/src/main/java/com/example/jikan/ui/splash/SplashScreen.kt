@@ -31,7 +31,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.size(140.dp),
         )
         Spacer(Modifier.height(16.dp))
-        Text(text = "Jikan", style = MaterialTheme.typography.displayMedium)
+        Text(text = "Ellie", style = MaterialTheme.typography.displayMedium)
         Spacer(Modifier.height(8.dp))
         Text(
             text = "by: JiehsDev",
