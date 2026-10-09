@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.jikan.R
+import com.example.jikan.study.CreditPolicy
+import androidx.compose.material3.LinearProgressIndicator
 
 /**
  * Stitch reference: Credit Conversion Rules. Explains the real earning
@@ -149,6 +151,14 @@ fun RulesScreen(
 
         Spacer(Modifier.height(12.dp))
 
+        // Credit profile selector.
+        CreditProfileCard(
+            state = state,
+            onSelectProfile = viewModel::setProfile,
+        )
+
+        Spacer(Modifier.height(12.dp))
+
         // Pacing algorithm.
         Column(
             modifier = Modifier
@@ -165,7 +175,7 @@ fun RulesScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Correct Recalls × 2 Minutes + Bonuses = Screen Credit",
+                text = "Validated Study Minutes → Tiered Credits",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -704,6 +714,142 @@ private fun GuardrailRow(icon: ImageVector, title: String, body: String, value: 
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
+private fun CreditProfileCard(
+    state: RulesUiState,
+    onSelectProfile: (CreditPolicy.CreditProfile) -> Unit,
+) {
+    val config = CreditPolicy.configFor(state.creditProfile)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(20.dp),
+    ) {
+        Text(
+            text = "CREDIT PROFILE",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.sp,
+        )
+        Spacer(Modifier.height(10.dp))
+        // Profile selector.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CreditPolicy.CreditProfile.entries.forEach { profile ->
+                val selected = profile == state.creditProfile
+                val cfg = CreditPolicy.configFor(profile)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .clickable { onSelectProfile(profile) }
+                        .padding(vertical = 12.dp, horizontal = 8.dp),
+                ) {
+                    Text(
+                        text = cfg.displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected) MaterialTheme.colorScheme.secondary
+                        else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "${cfg.dailyAllowanceMinutes}m/day",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = config.description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 20.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        // Today's progress.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${state.validatedMinutesToday}m studied today",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = state.currentTierLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (state.minutesToNextCredit > 0) {
+                Text(
+                    text = "+1 in ${state.minutesToNextCredit}m",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Daily allowance",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "${state.allowanceRemaining}m left of ${config.dailyAllowanceMinutes}m",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = {
+                if (config.dailyAllowanceMinutes > 0) {
+                    (state.allowanceRemaining.toFloat() / config.dailyAllowanceMinutes).coerceIn(0f, 1f)
+                } else 0f
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(CircleShape),
+            color = MaterialTheme.colorScheme.tertiary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Max ${config.maxUnlockMinutes}m per unlock session. Allowance is shared across all restricted apps.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 18.sp,
         )
     }
 }
