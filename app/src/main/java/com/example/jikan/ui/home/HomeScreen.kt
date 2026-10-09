@@ -299,7 +299,7 @@ private fun TopBar(
         Spacer(Modifier.width(4.dp))
         Image(
             painter = painterResource(R.drawable.mascot_jikan_coach),
-            contentDescription = "JikanCoach",
+            contentDescription = "Ellie",
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
@@ -392,7 +392,7 @@ private fun CoachCard(message: String, mood: CoachMood, onClick: () -> Unit) {
     ) {
         Image(
             painter = painterResource(R.drawable.mascot_jikan_coach),
-            contentDescription = "JikanCoach",
+            contentDescription = "Ellie",
             modifier = Modifier
                 .size(56.dp)
                 .clip(RoundedCornerShape(16.dp))
@@ -402,7 +402,7 @@ private fun CoachCard(message: String, mood: CoachMood, onClick: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "JikanCoach",
+                    text = "Ellie",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -1095,7 +1095,7 @@ private fun BankingModeDialog(
             confirmButton = {},
             icon = { CircularProgressIndicator() },
             title = { Text("Turning off protection") },
-            text = { Text("Jikan is turning off its Accessibility service for banking mode.") },
+            text = { Text("Ellie is turning off its Accessibility service for banking mode.") },
         )
         BankingModeStatus.Success -> AlertDialog(
             onDismissRequest = onDismiss,
