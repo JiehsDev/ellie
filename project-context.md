@@ -268,6 +268,27 @@ existing engine untouched (`EarnRule`, `EarnRuleValidator`,
 - Tests: `EarningAppsUiTest` (7 cases: progress math incl. cap/over-cap/
   invalid-rule guards, rule description, error mapping).
 
+## Phase 10: Restricted App Management
+
+Implemented 2026-10-09. User-facing config for Phase 4 restrictions; the
+deterministic enforcement (`AppRestrictionPolicy`, accessibility service)
+is untouched, and no AI is involved in blocking decisions.
+
+- Reused as-is: `AppRestriction`, `AppRestrictionDao` (already had
+  observeAll/get/upsert/delete), `AndroidUsageStatsDataSource` (the same
+  source enforcement reads, so the UI shows the numbers the policy acts on).
+- New `ui/settings/RestrictedAppsScreen.kt` + `RestrictedAppsViewModel.kt`,
+  mirroring the earning screen: installed-app list, per-app editor dialog
+  (daily limit; 0 = blocked on open per the entity contract), enable toggle,
+  delete. Validation: whole minutes, >= 0.
+- Rows show "23m / 30m · 7m remaining" / "45m / 45m · Limit reached" via pure
+  display helpers in `RestrictedAppUi.kt`; a usage-access note appears when
+  today's usage can't be read.
+- Navigation: new `RESTRICTED_APPS` route; Home's APP LIMITS section is now
+  always visible with a "Set up →"/"Edit →" action.
+- Tests: `RestrictedAppsUiTest` (7 cases: under/at/over limit, zero-limit
+  semantics, editor validation).
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.

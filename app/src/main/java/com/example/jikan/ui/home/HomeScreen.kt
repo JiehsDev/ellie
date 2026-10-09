@@ -74,6 +74,7 @@ fun HomeScreen(
     onStudyNow: () -> Unit,
     onOpenLockedApps: () -> Unit,
     onOpenEarningApps: () -> Unit,
+    onOpenRestrictedApps: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
 ) {
@@ -88,6 +89,7 @@ fun HomeScreen(
         onStudyNow = onStudyNow,
         onOpenLockedApps = onOpenLockedApps,
         onOpenEarningApps = onOpenEarningApps,
+        onOpenRestrictedApps = onOpenRestrictedApps,
         onDisableLockingForBanking = viewModel::disableLockingForBanking,
         onStartBankingAllowlist = viewModel::startBankingAllowlist,
         onStartFullDisableBankingMode = viewModel::startFullDisableBankingMode,
@@ -114,6 +116,7 @@ private fun HomeScreenContent(
     onStudyNow: () -> Unit,
     onOpenLockedApps: () -> Unit,
     onOpenEarningApps: () -> Unit,
+    onOpenRestrictedApps: () -> Unit,
     onDisableLockingForBanking: () -> Unit,
     onStartBankingAllowlist: (String, String, Int) -> Unit,
     onStartFullDisableBankingMode: (Int) -> Unit,
@@ -218,10 +221,8 @@ private fun HomeScreenContent(
         Spacer(Modifier.height(24.dp))
         EarningSection(summary = summary, onEdit = onOpenEarningApps)
 
-        if (summary != null) {
-            Spacer(Modifier.height(24.dp))
-            AppLimitsSection(summary = summary)
-        }
+        Spacer(Modifier.height(24.dp))
+        AppLimitsSection(summary = summary, onEdit = onOpenRestrictedApps)
 
         Spacer(Modifier.height(24.dp))
         LockedAppsSection(
@@ -536,9 +537,9 @@ private data class LimitRow(
 )
 
 @Composable
-private fun AppLimitsSection(summary: ScreenTimeSummary) {
+private fun AppLimitsSection(summary: ScreenTimeSummary?, onEdit: () -> Unit) {
     val rows = buildList {
-        summary.exceededApps.forEach {
+        summary?.exceededApps?.forEach {
             add(
                 LimitRow(
                     appLabel = it.appLabel,
@@ -549,7 +550,7 @@ private fun AppLimitsSection(summary: ScreenTimeSummary) {
                 )
             )
         }
-        summary.atLimitApps.forEach {
+        summary?.atLimitApps?.forEach {
             add(
                 LimitRow(
                     appLabel = it.appLabel,
@@ -560,7 +561,7 @@ private fun AppLimitsSection(summary: ScreenTimeSummary) {
                 )
             )
         }
-        summary.approachingApps.forEach {
+        summary?.approachingApps?.forEach {
             add(
                 LimitRow(
                     appLabel = it.appLabel,
@@ -573,7 +574,11 @@ private fun AppLimitsSection(summary: ScreenTimeSummary) {
         }
     }
     Column {
-        SectionHeader(title = "APP LIMITS", action = null, onAction = null)
+        SectionHeader(
+            title = "APP LIMITS",
+            action = if (rows.isEmpty()) "Set up  →" else "Edit  →",
+            onAction = onEdit,
+        )
         Spacer(Modifier.height(12.dp))
         if (rows.isEmpty()) {
             Text(
@@ -1248,6 +1253,7 @@ private fun HomeScreenPreview() {
             onStudyNow = {},
             onOpenLockedApps = {},
             onOpenEarningApps = {},
+            onOpenRestrictedApps = {},
             onDisableLockingForBanking = {},
             onStartBankingAllowlist = { _, _, _ -> },
             onStartFullDisableBankingMode = {},
