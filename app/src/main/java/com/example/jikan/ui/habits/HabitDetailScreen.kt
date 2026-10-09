@@ -467,7 +467,7 @@ fun HabitDetailScreen(
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Life fluctuates. In Jikan, missing a day does not reset your accumulated mastery or destroy your ledger. " +
+                text = "Life fluctuates. In Ellie, missing a day does not reset your accumulated mastery or destroy your ledger. " +
                     "Streaks represent active cadence, while total volume and spaced memory intervals remain permanently preserved.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
