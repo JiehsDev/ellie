@@ -255,7 +255,7 @@ private fun EarningRuleEditorDialog(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Jikan counts foreground time only — it can't tell whether you finished a lesson.",
+                    text = "Ellie counts foreground time only — it can't tell whether you finished a lesson.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
