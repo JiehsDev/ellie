@@ -166,6 +166,34 @@ single analytics layer — extended, not duplicated.
   yesterday comparison, weekly averages, top-app sorting, limit
   classification, earning/spending totals, weekly trend).
 
+## Phase 6: Coach Reoriented Around Screen Time
+
+Implemented 2026-10-09. Jikan Coach is now a screen-time companion. Existing
+architecture preserved and reused: `JikanCoachMessage`, `CoachInput`,
+`CoachEvent`, `CoachMood`, `AiCoach`, `RealAiCoach`, `FakeAiCoach` all kept.
+
+- `CoachInput` gains one field: `screenTime: ScreenTimeSummary?` — the Phase 5
+  structured facts. All arithmetic stays in the screentime package; AI only
+  interprets facts and never decides blocks, protection, wallet, or usage.
+- `CoachEvent` gains: AppLimitApproaching/Reached/Exceeded,
+  ProtectionDisabled/Restored, HighScreenTime, UsageImproved/Increased,
+  EarningCreditGranted, DailySummary.
+- `HomeCoachMessageProvider` priority: banking/protection safety first, then
+  screen-time events, then passive observations, then the preserved
+  study/wallet/morning fallbacks. Tone: calm, observant, supportive, slightly
+  playful; max two sentences; never judgmental; no invented statistics.
+  Deterministic — no local model required.
+- `HomeViewModel` feeds the Phase 5 summary into the coach (refreshed on
+  entry/resume and every 60 s) and derives the headline event from it.
+- `AiPromptBuilder.buildScreenTimeInsightPrompt` packages the facts with the
+  safety guardrails for optional model use.
+- Tests: `ScreenTimeCoachTest` (25 cases: safety priority, exact copy per
+  event, tone constraints incl. banned-word sweep, event derivation,
+  mood) plus a prompt-builder test. Note: the protection-off message was
+  reworded per the Phase 6 spec ("Protection is off right now. Jikan won't be
+  able to enforce your limits until you turn it back on."); the one existing
+  test asserting the old copy was updated.
+
 ## Jikan Coach
 
 Jikan Coach is the mascot/personality layer.

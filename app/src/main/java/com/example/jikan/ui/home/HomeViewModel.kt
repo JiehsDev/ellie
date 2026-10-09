@@ -10,6 +10,11 @@ import com.example.jikan.data.ThemeMode
 import com.example.jikan.data.UserSettings
 import com.example.jikan.data.Wallet
 import com.example.jikan.onboarding.PermissionStatus
+import com.example.jikan.screentime.AndroidUsageStatsDataSource
+import com.example.jikan.screentime.AppLabelResolver
+import com.example.jikan.screentime.ScreenTimeRepository
+import com.example.jikan.screentime.ScreenTimeSummary
+import com.example.jikan.screentime.ScreenTimeSummaryResult
 import com.example.jikan.service.PauseManager
 import com.example.jikan.service.StrictModeManager
 import kotlinx.coroutines.Dispatchers
@@ -54,8 +59,8 @@ data class HomeUiState(
     val batteryOptimizationsIgnored: Boolean = true,
     val bankingModeStatus: BankingModeStatus = BankingModeStatus.Idle,
     val coachMessage: String = "",
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val strictModeEnabled: Boolean = false,
+    val screenTimeSummary: ScreenTimeSummary? = null,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,    val strictModeEnabled: Boolean = false,
     val strictGraceUntilMs: Long = 0L,
     val bankingDisabledUntilMs: Long = 0L,
     val bankingModeActive: Boolean = false,
@@ -74,6 +79,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
     private val zone: ZoneId = ZoneId.systemDefault()
 
+    // Phase 6: screen-time facts for the coach. Lazy so the repository (and
+    // its UsageStatsManager access) is only built when Home is shown.
+    private val screenTimeRepository by lazy {
+        ScreenTimeRepository(
+            db = db,
+            usageStatsDataSource = AndroidUsageStatsDataSource(getApplication()),
+            appLabelResolver = AppLabelResolver(getApplication()),
+            zoneId = zone,
+        )
+    }
+
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
@@ -81,6 +97,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         refreshProtectionStatus()
         observeStats()
         observeLockedApps()
+        observeScreenTime()
     }
 
     private fun observeStats() {
@@ -168,6 +185,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Phase 6: feeds screen-time facts to the coach. Refreshed on entry and
+     * roughly every minute while Home is alive; usage stats move slowly, so
+     * there is no need to tie this to the faster stats collector.
+     */
+    private fun observeScreenTime() {
+        viewModelScope.launch {
+            refreshScreenTime()
+            while (true) {
+                delay(SCREEN_TIME_REFRESH_MS)
+                refreshScreenTime()
+            }
+        }
+    }
+
+    private suspend fun refreshScreenTime() {
+        val summary = when (val result = screenTimeRepository.summaryFor()) {
+            is ScreenTimeSummaryResult.Available -> result.summary
+            ScreenTimeSummaryResult.MissingUsageAccess -> null
+        }
+        _state.update {
+            val updated = it.copy(screenTimeSummary = summary)
+            updated.copy(coachMessage = coachMessageFor(updated))
+        }
+    }
+
+    /**
      * Re-read on every resume rather than observed: the user leaves the app entirely
      * to toggle the accessibility service, so there is nothing to subscribe to.
      */
@@ -181,6 +224,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val updated = it.copy(protectionOn = enabled, batteryOptimizationsIgnored = batteryIgnored)
                 updated.copy(coachMessage = coachMessageFor(updated))
             }
+            refreshScreenTime()
         }
     }
 
@@ -271,6 +315,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         studiedTodayMinutes: Int = state.week.firstOrNull { it.isToday }?.minutes ?: 0,
         studiedYesterdayMinutes: Int = state.week.lastOrNull { !it.isToday }?.minutes ?: 0,
     ): String {
+        // Phase 6: the coach observes screen-time facts. The most newsworthy
+        // current fact becomes the event; the full summary rides along for
+        // observational messages.
+        val summary = state.screenTimeSummary
         return HomeCoachMessageProvider.messageFor(
             CoachInput(
                 userName = state.userName,
@@ -282,6 +330,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 protectionOn = state.protectionOn,
                 bankingModeActive = state.bankingModeStatus == BankingModeStatus.Success && !state.protectionOn,
                 hourOfDay = Instant.now().atZone(zone).hour,
+                recentEvent = summary?.let { HomeCoachMessageProvider.screenTimeEventFor(it) }
+                    ?: CoachEvent.HomeOpened,
+                screenTime = summary,
             )
         )
     }
@@ -299,4 +350,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val lastViolationAtMs: Long,
         val lockedAppCount: Int,
     )
+
+    private companion object {
+        private const val SCREEN_TIME_REFRESH_MS = 60_000L
+    }
 }

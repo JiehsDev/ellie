@@ -32,8 +32,9 @@ class HomeCoachMessageProviderTest {
             )
         )
 
+        // Phase 6 reworded the protection message around screen-time limits.
         assertEquals(
-            "I can't guard your apps right now. Turn Jikan back on in Accessibility and I'll take watch again.",
+            "Protection is off right now. Jikan won't be able to enforce your limits until you turn it back on.",
             message,
         )
     }
